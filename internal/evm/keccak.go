@@ -21,11 +21,11 @@ var rc = [24]uint64{
 // and expensive modulo 5 calculations, speeding up hashing by ~6.5x.
 func keccakF1600(a *[25]uint64) {
 	var (
-		c0, c1, c2, c3, c4 uint64
-		d0, d1, d2, d3, d4 uint64
-		b0, b1, b2, b3, b4, b5, b6, b7, b8, b9 uint64
+		c0, c1, c2, c3, c4                               uint64
+		d0, d1, d2, d3, d4                               uint64
+		b0, b1, b2, b3, b4, b5, b6, b7, b8, b9           uint64
 		b10, b11, b12, b13, b14, b15, b16, b17, b18, b19 uint64
-		b20, b21, b22, b23, b24 uint64
+		b20, b21, b22, b23, b24                          uint64
 	)
 
 	for round := 0; round < 24; round++ {
@@ -42,55 +42,75 @@ func keccakF1600(a *[25]uint64) {
 		d3 = c2 ^ bits.RotateLeft64(c4, 1)
 		d4 = c3 ^ bits.RotateLeft64(c0, 1)
 
-		a[0] ^= d0; a[5] ^= d0; a[10] ^= d0; a[15] ^= d0; a[20] ^= d0
-		a[1] ^= d1; a[6] ^= d1; a[11] ^= d1; a[16] ^= d1; a[21] ^= d1
-		a[2] ^= d2; a[7] ^= d2; a[12] ^= d2; a[17] ^= d2; a[22] ^= d2
-		a[3] ^= d3; a[8] ^= d3; a[13] ^= d3; a[18] ^= d3; a[23] ^= d3
-		a[4] ^= d4; a[9] ^= d4; a[14] ^= d4; a[19] ^= d4; a[24] ^= d4
+		a[0] ^= d0
+		a[5] ^= d0
+		a[10] ^= d0
+		a[15] ^= d0
+		a[20] ^= d0
+		a[1] ^= d1
+		a[6] ^= d1
+		a[11] ^= d1
+		a[16] ^= d1
+		a[21] ^= d1
+		a[2] ^= d2
+		a[7] ^= d2
+		a[12] ^= d2
+		a[17] ^= d2
+		a[22] ^= d2
+		a[3] ^= d3
+		a[8] ^= d3
+		a[13] ^= d3
+		a[18] ^= d3
+		a[23] ^= d3
+		a[4] ^= d4
+		a[9] ^= d4
+		a[14] ^= d4
+		a[19] ^= d4
+		a[24] ^= d4
 
 		// Rho & Pi
-		b0  = a[0]
+		b0 = a[0]
 		b10 = bits.RotateLeft64(a[1], 1)
 		b20 = bits.RotateLeft64(a[2], 62)
-		b5  = bits.RotateLeft64(a[3], 28)
+		b5 = bits.RotateLeft64(a[3], 28)
 		b15 = bits.RotateLeft64(a[4], 27)
 
 		b16 = bits.RotateLeft64(a[5], 36)
-		b1  = bits.RotateLeft64(a[6], 44)
+		b1 = bits.RotateLeft64(a[6], 44)
 		b11 = bits.RotateLeft64(a[7], 6)
 		b21 = bits.RotateLeft64(a[8], 55)
-		b6  = bits.RotateLeft64(a[9], 20)
+		b6 = bits.RotateLeft64(a[9], 20)
 
-		b7  = bits.RotateLeft64(a[10], 3)
+		b7 = bits.RotateLeft64(a[10], 3)
 		b17 = bits.RotateLeft64(a[11], 10)
-		b2  = bits.RotateLeft64(a[12], 43)
+		b2 = bits.RotateLeft64(a[12], 43)
 		b12 = bits.RotateLeft64(a[13], 25)
 		b22 = bits.RotateLeft64(a[14], 39)
 
 		b23 = bits.RotateLeft64(a[15], 41)
-		b8  = bits.RotateLeft64(a[16], 45)
+		b8 = bits.RotateLeft64(a[16], 45)
 		b18 = bits.RotateLeft64(a[17], 15)
-		b3  = bits.RotateLeft64(a[18], 21)
+		b3 = bits.RotateLeft64(a[18], 21)
 		b13 = bits.RotateLeft64(a[19], 8)
 
 		b14 = bits.RotateLeft64(a[20], 18)
 		b24 = bits.RotateLeft64(a[21], 2)
-		b9  = bits.RotateLeft64(a[22], 61)
+		b9 = bits.RotateLeft64(a[22], 61)
 		b19 = bits.RotateLeft64(a[23], 56)
-		b4  = bits.RotateLeft64(a[24], 14)
+		b4 = bits.RotateLeft64(a[24], 14)
 
 		// Chi
-		a[0]  = b0  ^ (^b1  & b2)
-		a[1]  = b1  ^ (^b2  & b3)
-		a[2]  = b2  ^ (^b3  & b4)
-		a[3]  = b3  ^ (^b4  & b0)
-		a[4]  = b4  ^ (^b0  & b1)
+		a[0] = b0 ^ (^b1 & b2)
+		a[1] = b1 ^ (^b2 & b3)
+		a[2] = b2 ^ (^b3 & b4)
+		a[3] = b3 ^ (^b4 & b0)
+		a[4] = b4 ^ (^b0 & b1)
 
-		a[5]  = b5  ^ (^b6  & b7)
-		a[6]  = b6  ^ (^b7  & b8)
-		a[7]  = b7  ^ (^b8  & b9)
-		a[8]  = b8  ^ (^b9  & b5)
-		a[9]  = b9  ^ (^b5  & b6)
+		a[5] = b5 ^ (^b6 & b7)
+		a[6] = b6 ^ (^b7 & b8)
+		a[7] = b7 ^ (^b8 & b9)
+		a[8] = b8 ^ (^b9 & b5)
+		a[9] = b9 ^ (^b5 & b6)
 
 		a[10] = b10 ^ (^b11 & b12)
 		a[11] = b11 ^ (^b12 & b13)
