@@ -108,15 +108,23 @@ func EncodeStringParameter(s string) []byte {
 
 // DecodeString decodes a dynamic string from ABI return data.
 func DecodeString(data []byte, offset int) (string, error) {
-	if len(data) < offset+32 {
+	if offset < 0 || len(data) < offset+32 {
 		return "", errors.New("data too short for string offset")
 	}
-	strOffset := int(new(big.Int).SetBytes(data[offset : offset+32]).Int64())
-	if len(data) < strOffset+32 {
+	strOffsetBig := new(big.Int).SetBytes(data[offset : offset+32])
+	if !strOffsetBig.IsInt64() {
+		return "", errors.New("string offset exceeds int64 limit")
+	}
+	strOffset := int(strOffsetBig.Int64())
+	if strOffset < 0 || strOffset > len(data) || strOffset+32 > len(data) {
 		return "", errors.New("data too short for string length")
 	}
-	strLen := int(new(big.Int).SetBytes(data[strOffset : strOffset+32]).Int64())
-	if len(data) < strOffset+32+strLen {
+	strLenBig := new(big.Int).SetBytes(data[strOffset : strOffset+32])
+	if !strLenBig.IsInt64() {
+		return "", errors.New("string length exceeds int64 limit")
+	}
+	strLen := int(strLenBig.Int64())
+	if strLen < 0 || strLen > len(data)-(strOffset+32) {
 		return "", errors.New("data too short for string content")
 	}
 	return string(data[strOffset+32 : strOffset+32+strLen]), nil
@@ -124,7 +132,7 @@ func DecodeString(data []byte, offset int) (string, error) {
 
 // DecodeAddress decodes a 20-byte address from a 32-byte ABI word.
 func DecodeAddress(data []byte, offset int) string {
-	if len(data) < offset+32 {
+	if offset < 0 || len(data) < offset+32 {
 		return "0x0000000000000000000000000000000000000000"
 	}
 	return "0x" + hex.EncodeToString(data[offset+12:offset+32])
@@ -132,7 +140,7 @@ func DecodeAddress(data []byte, offset int) string {
 
 // DecodeUint256 decodes a uint256 word into *big.Int.
 func DecodeUint256(data []byte, offset int) *big.Int {
-	if len(data) < offset+32 {
+	if offset < 0 || len(data) < offset+32 {
 		return big.NewInt(0)
 	}
 	return new(big.Int).SetBytes(data[offset : offset+32])

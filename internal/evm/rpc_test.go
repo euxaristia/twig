@@ -39,3 +39,46 @@ func TestABIDecodeValues(t *testing.T) {
 		t.Fatalf("invalid address format: %s", addr)
 	}
 }
+
+func TestABIDecodeMalformedData(t *testing.T) {
+	// Negative offset checks
+	if _, err := DecodeString([]byte("short"), -1); err == nil {
+		t.Errorf("expected error for negative offset in DecodeString")
+	}
+	if addr := DecodeAddress([]byte("short"), -1); addr != "0x0000000000000000000000000000000000000000" {
+		t.Errorf("expected zero address for negative offset, got %s", addr)
+	}
+	if val := DecodeUint256([]byte("short"), -1); val.Sign() != 0 {
+		t.Errorf("expected 0 for negative offset in DecodeUint256")
+	}
+	if b := DecodeBool([]byte("short"), -1); b {
+		t.Errorf("expected false for negative offset in DecodeBool")
+	}
+
+	// Truncated data checks
+	shortData := make([]byte, 10)
+	if _, err := DecodeString(shortData, 0); err == nil {
+		t.Errorf("expected error for truncated data in DecodeString")
+	}
+
+	// 256-bit offset with high bit set (would evaluate to negative int64 if cast signed)
+	highBitData := make([]byte, 64)
+	highBitData[0] = 0x80 // Offset = 2^255
+	if _, err := DecodeString(highBitData, 0); err == nil {
+		t.Errorf("expected error for oversized offset in DecodeString")
+	}
+
+	bit63Data := make([]byte, 64)
+	bit63Data[24] = 0x80 // Offset = 2^63
+	if _, err := DecodeString(bit63Data, 0); err == nil {
+		t.Errorf("expected error for 2^63 offset in DecodeString")
+	}
+
+	// Valid offset, but string length exceeds remaining payload
+	validOffsetData := make([]byte, 64)
+	validOffsetData[31] = 32 // offset = 32
+	validOffsetData[63] = 99 // length = 99 (payload only has 64 bytes total)
+	if _, err := DecodeString(validOffsetData, 0); err == nil {
+		t.Errorf("expected error for out-of-bounds string length in DecodeString")
+	}
+}
