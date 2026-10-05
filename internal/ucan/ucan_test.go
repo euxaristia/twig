@@ -81,3 +81,36 @@ func TestUcanExpiration(t *testing.T) {
 		t.Fatalf("expected token to be expired")
 	}
 }
+
+func TestUcanNotBefore(t *testing.T) {
+	kp, err := identity.GenerateKeypair()
+	if err != nil {
+		t.Fatalf("generate keypair failed: %v", err)
+	}
+
+	futureNbf := time.Now().Add(1 * time.Hour).Unix()
+	token := &Ucan{
+		Payload: UcanPayload{
+			Ucan: "1.0.0",
+			Iss:  kp.DID(),
+			Aud:  kp.DID(),
+			Att:  []Capability{{With: "*", Can: "*"}},
+			Nbf:  &futureNbf,
+		},
+	}
+
+	if !token.IsBeforeValid() {
+		t.Fatalf("expected token to be invalid before nbf timestamp")
+	}
+
+	pastNbf := time.Now().Add(-1 * time.Hour).Unix()
+	validToken := &Ucan{
+		Payload: UcanPayload{
+			Nbf: &pastNbf,
+		},
+	}
+
+	if validToken.IsBeforeValid() {
+		t.Fatalf("expected token with past nbf to be valid")
+	}
+}
