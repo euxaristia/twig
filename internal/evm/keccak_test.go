@@ -20,3 +20,11 @@ func TestKeccak256(t *testing.T) {
 		t.Fatalf("expected %s, got %s", expectedTransfer, transferHash)
 	}
 }
+
+func BenchmarkKeccak256(b *testing.B) {
+	data := []byte("hello world this is a test string for keccak256 benchmarking")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = Keccak256(data)
+	}
+}
