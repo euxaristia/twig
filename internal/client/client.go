@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -231,6 +233,19 @@ func (c *NodeClient) sendOnce(method, path string, body []byte, proof string) (*
 func (c *NodeClient) solveICaptcha(srvURL, levelStr string) (string, error) {
 	if srvURL == "" {
 		srvURL = "https://icaptcha.twigpine.com"
+	}
+
+	u, err := url.Parse(srvURL)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("invalid icaptcha server URL: %s", srvURL)
+	}
+
+	hostname := u.Hostname()
+	ip := net.ParseIP(hostname)
+	isLocal := hostname == "localhost" || (ip != nil && ip.IsLoopback())
+
+	if u.Scheme != "https" && !(u.Scheme == "http" && isLocal) {
+		return "", fmt.Errorf("insecure icaptcha server URL scheme %q: must use https for remote endpoints", u.Scheme)
 	}
 
 	reqBody, _ := json.Marshal(map[string]interface{}{

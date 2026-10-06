@@ -98,3 +98,33 @@ func TestClientSameOriginRedirect(t *testing.T) {
 		t.Fatalf("expected status 302 Found (not followed), got %d", resp.StatusCode)
 	}
 }
+
+func TestSolveICaptchaURLValidation(t *testing.T) {
+	kp, err := identity.GenerateKeypair()
+	if err != nil {
+		t.Fatalf("failed to generate keypair: %v", err)
+	}
+	c := New("https://example.com", kp)
+
+	insecureURLs := []string{
+		"http://attacker.com",
+		"http://169.254.169.254/latest/meta-data/",
+		"http://127.0.0.1.attacker.com",
+		"ftp://icaptcha.com",
+		"file:///etc/passwd",
+		"invalid-url",
+	}
+
+	for _, u := range insecureURLs {
+		_, err := c.solveICaptcha(u, "1")
+		if err == nil {
+			t.Errorf("expected error for insecure/invalid URL %q, got nil", u)
+		}
+	}
+
+	// Local http URLs should pass validation (and fail at connection level)
+	_, err = c.solveICaptcha("http://127.0.0.1:12345", "1")
+	if err == nil || strings.Contains(err.Error(), "insecure icaptcha server URL scheme") {
+		t.Errorf("expected connection error for localhost http URL, got scheme error or nil: %v", err)
+	}
+}
