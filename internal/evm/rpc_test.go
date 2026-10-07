@@ -2,6 +2,7 @@ package evm
 
 import (
 	"math/big"
+	"net/http"
 	"testing"
 )
 
@@ -37,6 +38,27 @@ func TestABIDecodeValues(t *testing.T) {
 	addr := DecodeAddress(data, 32)
 	if len(addr) != 42 {
 		t.Fatalf("invalid address format: %s", addr)
+	}
+}
+
+func TestEVMSameOriginRedirect(t *testing.T) {
+	c := NewClient("https://example.com/rpc")
+	if c.HTTP.CheckRedirect == nil {
+		t.Fatal("expected CheckRedirect to be configured on EVM HTTP client")
+	}
+
+	req1, _ := http.NewRequest("POST", "https://example.com/rpc", nil)
+	reqRedirect, _ := http.NewRequest("POST", "https://evil.com/rpc", nil)
+
+	err := c.HTTP.CheckRedirect(reqRedirect, []*http.Request{req1})
+	if err != http.ErrUseLastResponse {
+		t.Errorf("expected ErrUseLastResponse for cross-origin redirect, got %v", err)
+	}
+
+	reqSameOrigin, _ := http.NewRequest("POST", "https://example.com/rpc2", nil)
+	errSame := c.HTTP.CheckRedirect(reqSameOrigin, []*http.Request{req1})
+	if errSame != nil {
+		t.Errorf("expected nil error for same-origin redirect, got %v", errSame)
 	}
 }
 
