@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -193,12 +192,16 @@ func (c *NodeClient) sendSigned(method, path string, body []byte) (*http.Respons
 			captchaLevel := resp.Header.Get("x-icaptcha-level")
 			if (captchaURL != "" || captchaLevel != "") && c.Keypair != nil {
 				solvedProof, err := c.solveICaptcha(captchaURL, captchaLevel)
-				if err == nil && solvedProof != "" {
-					attempts++
-					proof = solvedProof
-					resp.Body.Close()
-					continue
+				resp.Body.Close()
+				if err != nil {
+					return nil, fmt.Errorf("solving iCaptcha: %w", err)
 				}
+				if solvedProof == "" {
+					return nil, fmt.Errorf("solving iCaptcha: empty proof")
+				}
+				attempts++
+				proof = solvedProof
+				continue
 			}
 		}
 
@@ -230,6 +233,9 @@ func (c *NodeClient) sendOnce(method, path string, body []byte, proof string) (*
 	return c.Client.Do(req)
 }
 
+// solveICaptcha obtains a proof token from the iCaptcha service for the
+// x-icaptcha-proof retry header. The full challenge protocol lives in
+// icaptcha.go.
 func (c *NodeClient) solveICaptcha(srvURL, levelStr string) (string, error) {
 	if srvURL == "" {
 		srvURL = "https://icaptcha.twigpine.com"
@@ -248,66 +254,10 @@ func (c *NodeClient) solveICaptcha(srvURL, levelStr string) (string, error) {
 		return "", fmt.Errorf("insecure icaptcha server URL scheme %q: must use https for remote endpoints", u.Scheme)
 	}
 
-	reqBody, _ := json.Marshal(map[string]interface{}{
-		"requesterId": c.Keypair.DID(),
-		"types":       []string{"arithmetic", "algebra", "sequence"},
-	})
-
-	resp, err := c.Client.Post(srvURL+"/v1/challenge", "application/json", bytes.NewReader(reqBody))
-	if err != nil {
-		return "", err
+	if c.Keypair == nil {
+		return "", fmt.Errorf("iCaptcha requires an identity")
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("challenge request failed with %d", resp.StatusCode)
-	}
-
-	var challengeResp struct {
-		ChallengeID string `json:"challengeId"`
-		Pow         *struct {
-			Algorithm  string `json:"algorithm"`
-			Challenge  string `json:"challenge"`
-			Difficulty int    `json:"difficulty"`
-		} `json:"pow"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&challengeResp); err != nil {
-		return "", err
-	}
-
-	// Solve PoW if required
-	var nonce string
-	if challengeResp.Pow != nil && challengeResp.Pow.Difficulty > 0 {
-		targetZeros := challengeResp.Pow.Difficulty
-		for i := 0; i < (1 << 24); i++ {
-			candidate := fmt.Sprintf("%d", i)
-			hash := sha256.Sum256([]byte(challengeResp.Pow.Challenge + ":" + candidate))
-			if countLeadingZeroBits(hash[:]) >= targetZeros {
-				nonce = candidate
-				break
-			}
-		}
-	}
-
-	ansBody, _ := json.Marshal(map[string]interface{}{
-		"challengeId": challengeResp.ChallengeID,
-		"nonce":       nonce,
-	})
-
-	ansResp, err := c.Client.Post(srvURL+"/v1/answer", "application/json", bytes.NewReader(ansBody))
-	if err != nil {
-		return "", err
-	}
-	defer ansResp.Body.Close()
-
-	var proofResp struct {
-		Proof string `json:"proof"`
-	}
-	if err := json.NewDecoder(ansResp.Body).Decode(&proofResp); err != nil {
-		return "", err
-	}
-
-	return proofResp.Proof, nil
+	return obtainICaptchaProof(c.Client, srvURL, c.Keypair.DID(), levelStr)
 }
 
 func countLeadingZeroBits(data []byte) int {
