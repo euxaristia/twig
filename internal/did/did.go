@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 )
 
@@ -27,6 +26,8 @@ func init() {
 }
 
 // EncodeBase58 encodes a byte slice into Bitcoin base58.
+// Optimized to perform base conversion in-place using stack-allocated buffers,
+// avoiding big.Int heap allocations and arithmetic overhead.
 func EncodeBase58(input []byte) string {
 	if len(input) == 0 {
 		return ""
@@ -37,30 +38,54 @@ func EncodeBase58(input []byte) string {
 		zeros++
 	}
 
-	n := new(big.Int).SetBytes(input)
-	radix := big.NewInt(58)
-	zero := big.NewInt(0)
-	mod := new(big.Int)
+	var tmpBuf [128]byte
+	var tmp []byte
+	if len(input) <= len(tmpBuf) {
+		tmp = tmpBuf[:len(input)]
+		copy(tmp, input)
+	} else {
+		tmp = make([]byte, len(input))
+		copy(tmp, input)
+	}
 
-	var encoded []byte
-	for n.Cmp(zero) > 0 {
-		n.DivMod(n, radix, mod)
-		encoded = append(encoded, b58Alphabet[mod.Int64()])
+	outCap := len(input)*138/100 + 2
+	var outBuf [256]byte
+	var out []byte
+	if outCap <= len(outBuf) {
+		out = outBuf[:0]
+	} else {
+		out = make([]byte, 0, outCap)
+	}
+
+	start := zeros
+	for start < len(tmp) {
+		var remainder uint32
+		for i := start; i < len(tmp); i++ {
+			acc := uint32(tmp[i]) + remainder*256
+			tmp[i] = byte(acc / 58)
+			remainder = acc % 58
+		}
+		out = append(out, b58Alphabet[remainder])
+		for start < len(tmp) && tmp[start] == 0 {
+			start++
+		}
 	}
 
 	for i := 0; i < zeros; i++ {
-		encoded = append(encoded, b58Alphabet[0])
+		out = append(out, b58Alphabet[0])
 	}
 
 	// Reverse
-	for i, j := 0, len(encoded)-1; i < j; i, j = i+1, j-1 {
-		encoded[i], encoded[j] = encoded[j], encoded[i]
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
 	}
 
-	return string(encoded)
+	return string(out)
 }
 
 // DecodeBase58 decodes a Bitcoin base58 encoded string.
+// Optimized to convert base58 to bytes directly using stack-allocated buffers,
+// eliminating big.Int allocations.
 func DecodeBase58(input string) ([]byte, error) {
 	if len(input) == 0 {
 		return nil, nil
@@ -71,31 +96,66 @@ func DecodeBase58(input string) ([]byte, error) {
 		zeros++
 	}
 
-	n := big.NewInt(0)
-	radix := big.NewInt(58)
+	outCap := (len(input)-zeros)*733/1000 + 1
+	var outBuf [128]byte
+	var out []byte
+	if outCap <= len(outBuf) {
+		out = outBuf[:outCap]
+		for i := range out {
+			out[i] = 0
+		}
+	} else {
+		out = make([]byte, outCap)
+	}
+
+	outLen := 0
 	for i := zeros; i < len(input); i++ {
 		idx := b58Indexes[input[i]]
 		if idx == -1 {
 			return nil, fmt.Errorf("invalid base58 character: %c", input[i])
 		}
-		n.Mul(n, radix)
-		n.Add(n, big.NewInt(int64(idx)))
+
+		carry := uint32(idx)
+		for j := 0; j < outLen; j++ {
+			acc := uint32(out[outCap-1-j])*58 + carry
+			out[outCap-1-j] = byte(acc)
+			carry = acc >> 8
+		}
+		for carry > 0 {
+			if outLen >= len(out) {
+				newOut := make([]byte, len(out)+8)
+				copy(newOut[8:], out)
+				out = newOut
+				outCap = len(out)
+			}
+			acc := uint32(out[outCap-1-outLen])*58 + carry
+			out[outCap-1-outLen] = byte(acc)
+			carry = acc >> 8
+			outLen++
+		}
 	}
 
-	bytes := n.Bytes()
-	result := make([]byte, zeros+len(bytes))
-	copy(result[zeros:], bytes)
+	start := outCap - outLen
+	for start < outCap && out[start] == 0 {
+		start++
+	}
+
+	actualBytesLen := outCap - start
+	result := make([]byte, zeros+actualBytesLen)
+	copy(result[zeros:], out[start:outCap])
 	return result, nil
 }
 
 // FromVerifyingKey constructs a did:key string from an Ed25519 public key.
+// Optimized with stack array allocation and direct string concatenation.
 func FromVerifyingKey(pubKey ed25519.PublicKey) string {
-	prefixed := make([]byte, 0, len(ed25519Multicodec)+len(pubKey))
-	prefixed = append(prefixed, ed25519Multicodec...)
-	prefixed = append(prefixed, pubKey...)
+	var prefixed [34]byte
+	prefixed[0] = ed25519Multicodec[0]
+	prefixed[1] = ed25519Multicodec[1]
+	copy(prefixed[2:], pubKey)
 
-	encoded := EncodeBase58(prefixed)
-	return fmt.Sprintf("did:key:z%s", encoded)
+	encoded := EncodeBase58(prefixed[:])
+	return "did:key:z" + encoded
 }
 
 // ToVerifyingKey extracts the Ed25519 public key from a did:key string.
