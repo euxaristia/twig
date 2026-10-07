@@ -34,6 +34,19 @@ func NewClient(rpcURL string) *Client {
 		RPCURL: rpcURL,
 		HTTP: &http.Client{
 			Timeout: 15 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) > 10 {
+					return http.ErrUseLastResponse
+				}
+				if len(via) > 0 {
+					prev := via[len(via)-1]
+					// Security: Only allow same-origin redirects to prevent redirect hijacking/SSRF
+					if prev.URL.Scheme != req.URL.Scheme || prev.URL.Host != req.URL.Host {
+						return http.ErrUseLastResponse
+					}
+				}
+				return nil
+			},
 		},
 	}
 }
