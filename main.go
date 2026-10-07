@@ -170,6 +170,56 @@ func parseFlags(name string, args []string) *flag.FlagSet {
 	return fs
 }
 
+// parseReordered parses command arguments with GNU-style permutation:
+// options may appear before or after positional arguments, and "--" still
+// ends option parsing. This matches the clap behavior of the Rust CLI:
+// supplied options are never silently dropped after a positional.
+func parseReordered(fs *flag.FlagSet, args []string) error {
+	var opts, positionals []string
+	i := 0
+	for i < len(args) {
+		a := args[i]
+		if a == "--" {
+			positionals = append(positionals, args[i+1:]...)
+			break
+		}
+		if len(a) > 1 && a[0] == '-' {
+			name := strings.TrimLeft(a, "-")
+			if eq := strings.IndexByte(name, '='); eq >= 0 {
+				name = name[:eq]
+			}
+			opts = append(opts, a)
+			// A non-boolean flag consumes the next argument as its value.
+			// A missing value (end of args, "--", or another flag) is an
+			// error: the flag must not silently steal a positional.
+			if !strings.Contains(a, "=") {
+				if f := fs.Lookup(name); f != nil {
+					if bf, ok := f.Value.(interface{ IsBoolFlag() bool }); !ok || !bf.IsBoolFlag() {
+						next := ""
+						if i+1 < len(args) {
+							next = args[i+1]
+						}
+						if next == "" || next == "--" || (len(next) > 1 && next[0] == '-') {
+							return fmt.Errorf("flag needs an argument: %s", a)
+						}
+						opts = append(opts, next)
+						i++
+					}
+				}
+			}
+			i++
+			continue
+		}
+		positionals = append(positionals, a)
+		i++
+	}
+	// The "--" keeps option parsing from reaching the positionals, so a
+	// trailing valueless flag errors instead of consuming a positional.
+	reordered := append(opts, "--")
+	reordered = append(reordered, positionals...)
+	return fs.Parse(reordered)
+}
+
 func handleIdentity(args []string) {
 	if len(args) == 0 {
 		fmt.Println("Usage: twig identity <new|show|export|sign|backup|restore> [flags]")
@@ -184,25 +234,25 @@ func handleIdentity(args []string) {
 	switch sub {
 	case "new":
 		force := fs.Bool("force", false, "Overwrite existing keys without confirmation")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.IdentityNew(*dir, *force, os.Stdin); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "show":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.IdentityShow(*dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "export":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.IdentityExport(*dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "sign":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: message required to sign")
@@ -214,14 +264,14 @@ func handleIdentity(args []string) {
 		}
 	case "backup":
 		out := fs.String("out", "", "Destination path for backup file")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.IdentityBackup(*dir, *out); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "restore":
 		force := fs.Bool("force", false, "Overwrite existing identity without prompting")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: path to backup file required")
@@ -243,7 +293,7 @@ func handleRegister(args []string) {
 	caps := fs.String("capabilities", "git:push,git:fetch,issue:create,pr:open", "Comma-separated capabilities")
 	model := fs.String("model", "", "Model/agent identifier")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	capList := strings.Split(*caps, ",")
 	if err := commands.Register(*node, capList, *model, *dir); err != nil {
@@ -257,7 +307,7 @@ func handleWhoami(args []string) {
 	node := fs.String("node", "", "Node URL to query")
 	dir := fs.String("dir", "", "Identity directory")
 	jsonOut := fs.Bool("json", false, "Output structured JSON")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	if err := commands.Whoami(*node, *dir, *jsonOut); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -271,7 +321,7 @@ func handleClone(args []string) {
 	node := fs.String("node", "", "Node URL")
 	arweave := fs.String("arweave-gateway", "https://arweave.net", "Arweave gateway URL")
 	ipfs := fs.String("ipfs-gateway", "https://dweb.link", "IPFS gateway URL")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	tail := fs.Args()
 	if len(tail) == 0 {
@@ -306,7 +356,7 @@ func handleRepo(args []string) {
 		desc := fs.String("description", "", "Repository description")
 		priv := fs.Bool("private", false, "Make repository private")
 		branch := fs.String("branch", "main", "Default branch")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repository name required")
@@ -319,7 +369,7 @@ func handleRepo(args []string) {
 	case "list":
 		format := fs.String("format", "table", "Output format: table or json")
 		outputJSON := fs.Bool("json", false, "Output the complete response as JSON")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if *format != "table" && *format != "json" {
 			fmt.Fprintf(os.Stderr, "error: unsupported output format %q (expected table or json)\n", *format)
 			os.Exit(1)
@@ -342,7 +392,7 @@ func handleRepo(args []string) {
 			os.Exit(1)
 		}
 	case "clone":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repository name required")
@@ -353,7 +403,7 @@ func handleRepo(args []string) {
 			os.Exit(1)
 		}
 	case "info":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repository name required")
@@ -366,7 +416,7 @@ func handleRepo(args []string) {
 	case "commits":
 		branch := fs.String("branch", "main", "Branch name")
 		limit := fs.Int("limit", 20, "Commit count limit")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repository name required")
@@ -378,7 +428,7 @@ func handleRepo(args []string) {
 		}
 	case "fork":
 		name := fs.String("name", "", "New name for the fork")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repository name required")
@@ -389,7 +439,7 @@ func handleRepo(args []string) {
 			os.Exit(1)
 		}
 	case "label-add":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and label required: twig repo label-add <repo> <label>")
@@ -400,7 +450,7 @@ func handleRepo(args []string) {
 			os.Exit(1)
 		}
 	case "label-remove":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and label required: twig repo label-remove <repo> <label>")
@@ -411,7 +461,7 @@ func handleRepo(args []string) {
 			os.Exit(1)
 		}
 	case "label-list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repo name required")
@@ -423,7 +473,7 @@ func handleRepo(args []string) {
 		}
 	case "owner":
 		jsonOut := fs.Bool("json", false, "Output JSON")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repo name required")
@@ -435,7 +485,7 @@ func handleRepo(args []string) {
 		}
 	case "replica-register":
 		urlVal := fs.String("url", "", "Public URL of replica node")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *urlVal == "" {
 			fmt.Fprintln(os.Stderr, "error: repo and --url required")
@@ -446,7 +496,7 @@ func handleRepo(args []string) {
 			os.Exit(1)
 		}
 	case "replica-unregister":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repo name required")
@@ -457,7 +507,7 @@ func handleRepo(args []string) {
 			os.Exit(1)
 		}
 	case "replicas":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repo name required")
@@ -488,7 +538,7 @@ func handleIssue(args []string) {
 	case "create":
 		title := fs.String("title", "", "Issue title")
 		body := fs.String("body", "", "Issue body")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *title == "" {
 			fmt.Fprintln(os.Stderr, "error: repo and --title required")
@@ -499,7 +549,7 @@ func handleIssue(args []string) {
 			os.Exit(1)
 		}
 	case "list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repo name required")
@@ -510,7 +560,7 @@ func handleIssue(args []string) {
 			os.Exit(1)
 		}
 	case "show":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and issue ID required: twig issue show <repo> <id>")
@@ -521,7 +571,7 @@ func handleIssue(args []string) {
 			os.Exit(1)
 		}
 	case "close":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and issue ID required: twig issue close <repo> <id>")
@@ -533,7 +583,7 @@ func handleIssue(args []string) {
 		}
 	case "comment":
 		body := fs.String("body", "", "Comment body")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 || *body == "" {
 			fmt.Fprintln(os.Stderr, "error: repo, issue ID, and --body required")
@@ -544,7 +594,7 @@ func handleIssue(args []string) {
 			os.Exit(1)
 		}
 	case "comments":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and issue ID required")
@@ -578,7 +628,7 @@ func handlePR(args []string) {
 		title := fs.String("title", "", "PR title")
 		body := fs.String("body", "", "PR body")
 		owner := fs.String("owner", "", "Repo owner DID")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *head == "" || *title == "" {
 			fmt.Fprintln(os.Stderr, "error: repo, --head, and --title required")
@@ -589,7 +639,7 @@ func handlePR(args []string) {
 			os.Exit(1)
 		}
 	case "list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repo required")
@@ -600,7 +650,7 @@ func handlePR(args []string) {
 			os.Exit(1)
 		}
 	case "view":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and PR number required: twig pr view <repo> <number>")
@@ -612,7 +662,7 @@ func handlePR(args []string) {
 			os.Exit(1)
 		}
 	case "diff":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and PR number required")
@@ -624,7 +674,7 @@ func handlePR(args []string) {
 			os.Exit(1)
 		}
 	case "merge":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and PR number required")
@@ -638,7 +688,7 @@ func handlePR(args []string) {
 	case "review":
 		status := fs.String("status", "comment", "Review status (approved, changes_requested, comment)")
 		body := fs.String("body", "", "Review body")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and PR number required")
@@ -651,7 +701,7 @@ func handlePR(args []string) {
 		}
 	case "comment":
 		body := fs.String("body", "", "Comment body")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 || *body == "" {
 			fmt.Fprintln(os.Stderr, "error: repo, PR number, and --body required")
@@ -663,7 +713,7 @@ func handlePR(args []string) {
 			os.Exit(1)
 		}
 	case "comments":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and PR number required")
@@ -693,13 +743,13 @@ func handlePeer(args []string) {
 
 	switch sub {
 	case "list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.PeerList(*node); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "add":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: peer URL required: twig peer add <peer_url>")
@@ -710,7 +760,7 @@ func handlePeer(args []string) {
 			os.Exit(1)
 		}
 	case "ping":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: peer DID required")
@@ -721,7 +771,7 @@ func handlePeer(args []string) {
 			os.Exit(1)
 		}
 	case "resolve":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: peer DID required")
@@ -750,7 +800,7 @@ func handleCert(args []string) {
 
 	switch sub {
 	case "list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repo name required")
@@ -763,7 +813,7 @@ func handleCert(args []string) {
 	case "show":
 		verify := fs.Bool("verify", false, "Cryptographically verify Ed25519 signature")
 		expect := fs.String("expect-node", "", "Expected issuing node DID")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and cert ID required: twig cert show <repo> <id>")
@@ -792,14 +842,14 @@ func handleIPFS(args []string) {
 
 	switch sub {
 	case "list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.IpfsList(*node, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "get":
 		scan := fs.String("scan", "", "Resume token for scan continuation")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: CID required: twig ipfs get <cid>")
@@ -831,13 +881,13 @@ func handleNode(args []string) {
 
 	switch sub {
 	case "status":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.NodeStatus(*node, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "trust":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: DID required: twig node trust <did>")
@@ -848,7 +898,7 @@ func handleNode(args []string) {
 			os.Exit(1)
 		}
 	case "resolve":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: DID required")
@@ -862,7 +912,7 @@ func handleNode(args []string) {
 		stake := fs.Uint64("stake", 10000, "Stake amount")
 		httpURL := fs.String("http-url", "", "Public HTTP URL of node")
 		token := fs.String("token", os.Getenv("GITLAWB_TOKEN"), "Token address")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if *httpURL == "" {
 			fmt.Fprintln(os.Stderr, "error: --http-url required")
 			os.Exit(1)
@@ -872,31 +922,31 @@ func handleNode(args []string) {
 			os.Exit(1)
 		}
 	case "heartbeat":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.NodeHeartbeat(*privKey, *rpc, *contract); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "onchain-status":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.NodeOnchainStatus(*node, *rpc, *contract); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "claim":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.NodeClaim(*privKey, *rpc, *contract); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "unstake-request":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.NodeUnstakeRequest(*privKey, *rpc, *contract); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "unstake":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.NodeUnstake(*privKey, *rpc, *contract); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -923,7 +973,7 @@ func handleWebhook(args []string) {
 		hookURL := fs.String("url", "", "Webhook URL")
 		events := fs.String("events", "*", "Events to subscribe to")
 		secret := fs.String("secret", "", "HMAC secret")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *hookURL == "" {
 			fmt.Fprintln(os.Stderr, "error: repo and --url required: twig webhook create <repo> --url <url>")
@@ -934,7 +984,7 @@ func handleWebhook(args []string) {
 			os.Exit(1)
 		}
 	case "list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: repo name required")
@@ -945,7 +995,7 @@ func handleWebhook(args []string) {
 			os.Exit(1)
 		}
 	case "delete":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) < 2 {
 			fmt.Fprintln(os.Stderr, "error: repo and webhook ID required: twig webhook delete <repo> <id>")
@@ -967,7 +1017,7 @@ func handleMirror(args []string) {
 	desc := fs.String("description", "", "Repository description")
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	tail := fs.Args()
 	if len(tail) == 0 {
@@ -990,7 +1040,7 @@ func handleMCP(args []string) {
 	fs := parseFlags("mcp serve", subArgs)
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(subArgs)
+	_ = parseReordered(fs, subArgs)
 
 	kp, _ := identity.LoadKeypair(*dir)
 	nodeURL := *node
@@ -1015,7 +1065,7 @@ func handleSync(args []string) {
 	fs := parseFlags("sync "+sub, subArgs)
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(subArgs)
+	_ = parseReordered(fs, subArgs)
 
 	switch sub {
 	case "trigger":
@@ -1053,7 +1103,7 @@ func handleTask(args []string) {
 		payload := fs.String("payload", "", "Task JSON payload")
 		ucanTok := fs.String("ucan-token", "", "UCAN token")
 		deadline := fs.String("deadline", "", "Deadline ISO-8601")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: task kind required: twig task create <kind>")
@@ -1067,13 +1117,13 @@ func handleTask(args []string) {
 		status := fs.String("status", "", "Filter by status")
 		assignee := fs.String("assignee-did", "", "Filter by assignee")
 		limit := fs.Int("limit", 50, "Limit")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.TaskList(*status, *assignee, *limit, *node); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "view":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: task ID required")
@@ -1084,7 +1134,7 @@ func handleTask(args []string) {
 			os.Exit(1)
 		}
 	case "claim":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: task ID required")
@@ -1096,7 +1146,7 @@ func handleTask(args []string) {
 		}
 	case "complete":
 		res := fs.String("result", "", "Result string")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: task ID required")
@@ -1108,7 +1158,7 @@ func handleTask(args []string) {
 		}
 	case "fail":
 		reason := fs.String("reason", "", "Failure reason")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: task ID required")
@@ -1139,7 +1189,7 @@ func handleName(args []string) {
 
 	switch sub {
 	case "resolve":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: name required: twig name resolve <name>")
@@ -1150,7 +1200,7 @@ func handleName(args []string) {
 			os.Exit(1)
 		}
 	case "lookup":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: DID required: twig name lookup <did>")
@@ -1161,7 +1211,7 @@ func handleName(args []string) {
 			os.Exit(1)
 		}
 	case "available":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: name required: twig name available <name>")
@@ -1172,7 +1222,7 @@ func handleName(args []string) {
 			os.Exit(1)
 		}
 	case "register":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: name required: twig name register <name>")
@@ -1183,7 +1233,7 @@ func handleName(args []string) {
 			os.Exit(1)
 		}
 	case "resolve-did":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: DID required")
@@ -1194,7 +1244,7 @@ func handleName(args []string) {
 			os.Exit(1)
 		}
 	case "register-did":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.NameRegisterDID(*privKey, *rpc, *contract, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -1209,7 +1259,7 @@ func handleDoctor(args []string) {
 	fs := parseFlags("doctor", args)
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	if err := commands.Doctor(*node, *dir); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -1223,7 +1273,7 @@ func handleInit(args []string) {
 	desc := fs.String("description", "", "Repository description")
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	if err := commands.Init(*name, *desc, *node, *dir); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -1236,7 +1286,7 @@ func handleQuickstart(args []string) {
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
 	yes := fs.Bool("yes", false, "Skip prompts")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	if err := commands.Quickstart(*node, *dir, *yes); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -1254,7 +1304,7 @@ func handleStar(args []string) {
 	fs := parseFlags("star "+sub, subArgs)
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(subArgs)
+	_ = parseReordered(fs, subArgs)
 
 	tail := fs.Args()
 	if len(tail) == 0 {
@@ -1288,7 +1338,7 @@ func handleStatus(args []string) {
 	fs := parseFlags("status", args)
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	if err := commands.Status(*node, *dir); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -1309,13 +1359,13 @@ func handleAgent(args []string) {
 	switch sub {
 	case "list":
 		capStr := fs.String("capability", "", "Filter by capability")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.AgentList(*capStr, *node); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "show":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: agent DID required")
@@ -1353,13 +1403,13 @@ func handleProfile(args []string) {
 		farcaster := fs.String("farcaster", "", "Farcaster handle")
 		telegram := fs.String("telegram", "", "Telegram username")
 		pin := fs.Bool("pin", false, "Pin to IPFS")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.ProfileSet(*name, *bio, *avatar, *web, *twitter, *github, *farcaster, *telegram, *pin, *node, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "show":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		targetDID := ""
 		if len(tail) > 0 {
@@ -1370,13 +1420,13 @@ func handleProfile(args []string) {
 			os.Exit(1)
 		}
 	case "clear":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.ProfileClear(*node, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "pin":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.ProfilePin(*node, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -1401,7 +1451,7 @@ func handleProtect(args []string) {
 
 	switch sub {
 	case "set":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *repo == "" {
 			fmt.Fprintln(os.Stderr, "error: branch and --repo required: twig protect set <branch> --repo <repo>")
@@ -1412,7 +1462,7 @@ func handleProtect(args []string) {
 			os.Exit(1)
 		}
 	case "remove":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *repo == "" {
 			fmt.Fprintln(os.Stderr, "error: branch and --repo required: twig protect remove <branch> --repo <repo>")
@@ -1423,7 +1473,7 @@ func handleProtect(args []string) {
 			os.Exit(1)
 		}
 	case "list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if *repo == "" {
 			fmt.Fprintln(os.Stderr, "error: --repo required")
 			os.Exit(1)
@@ -1454,7 +1504,7 @@ func handleVisibility(args []string) {
 	case "set":
 		readers := fs.String("readers", "", "Comma-separated reader DIDs")
 		mode := fs.String("mode", "b", "Mode: 'a' (hide) or 'b' (lock)")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *repo == "" {
 			fmt.Fprintln(os.Stderr, "error: path_glob and --repo required")
@@ -1466,7 +1516,7 @@ func handleVisibility(args []string) {
 			os.Exit(1)
 		}
 	case "remove":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *repo == "" {
 			fmt.Fprintln(os.Stderr, "error: path_glob and --repo required")
@@ -1477,7 +1527,7 @@ func handleVisibility(args []string) {
 			os.Exit(1)
 		}
 	case "list":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if *repo == "" {
 			fmt.Fprintln(os.Stderr, "error: --repo required")
 			os.Exit(1)
@@ -1497,7 +1547,7 @@ func handleChangelog(args []string) {
 	limit := fs.Int("limit", 20, "Maximum events to show")
 	node := fs.String("node", "", "Node URL")
 	dir := fs.String("dir", "", "Identity directory")
-	_ = fs.Parse(args)
+	_ = parseReordered(fs, args)
 
 	tail := fs.Args()
 	repo := ""
@@ -1529,7 +1579,7 @@ func handleBounty(args []string) {
 		issue := fs.String("issue", "", "Issue ID")
 		tx := fs.String("tx-hash", "", "Transaction hash")
 		deadline := fs.Int64("deadline", 0, "Deadline in seconds")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *title == "" || *amount <= 0 {
 			fmt.Fprintln(os.Stderr, "error: repo, --title, and --amount required")
@@ -1542,13 +1592,13 @@ func handleBounty(args []string) {
 	case "list":
 		repo := fs.String("repo", "", "Filter by repo")
 		status := fs.String("status", "", "Filter by status")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.BountyList(*repo, *status, *node, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "show":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: bounty ID required")
@@ -1560,7 +1610,7 @@ func handleBounty(args []string) {
 		}
 	case "claim":
 		wallet := fs.String("wallet", "", "Claimant wallet address")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: bounty ID required")
@@ -1572,7 +1622,7 @@ func handleBounty(args []string) {
 		}
 	case "submit":
 		pr := fs.String("pr", "", "PR ID/number")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 || *pr == "" {
 			fmt.Fprintln(os.Stderr, "error: bounty ID and --pr required")
@@ -1583,7 +1633,7 @@ func handleBounty(args []string) {
 			os.Exit(1)
 		}
 	case "approve":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: bounty ID required")
@@ -1594,7 +1644,7 @@ func handleBounty(args []string) {
 			os.Exit(1)
 		}
 	case "cancel":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: bounty ID required")
@@ -1628,7 +1678,7 @@ func handleUcan(args []string) {
 		expiry := fs.Int("expiry", 0, "Expiry in hours")
 		out := fs.String("out", "", "Save UCAN to file")
 		jsonOut := fs.Bool("json", false, "Output as JSON")
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if *to == "" || *capStr == "" || *can == "" {
 			fmt.Fprintln(os.Stderr, "error: --to, --cap, and --can required")
 			os.Exit(1)
@@ -1638,13 +1688,13 @@ func handleUcan(args []string) {
 			os.Exit(1)
 		}
 	case "show":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		if err := commands.UcanShow(*dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "verify":
-		_ = fs.Parse(subArgs)
+		_ = parseReordered(fs, subArgs)
 		tail := fs.Args()
 		if len(tail) == 0 {
 			fmt.Fprintln(os.Stderr, "error: UCAN token or file required: twig ucan verify <token>")
