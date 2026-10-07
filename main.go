@@ -867,37 +867,37 @@ func handleNode(args []string) {
 			fmt.Fprintln(os.Stderr, "error: --http-url required")
 			os.Exit(1)
 		}
-		if err := commands.NodeRegisterOnchain(*stake, *httpURL, *privKey, *rpc, *contract, *token); err != nil {
+		if err := commands.NodeRegisterOnchain(*stake, *httpURL, *privKey, *rpc, *contract, *token, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "heartbeat":
 		_ = fs.Parse(subArgs)
-		if err := commands.NodeHeartbeat(*privKey, *rpc, *contract); err != nil {
+		if err := commands.NodeHeartbeat(*privKey, *rpc, *contract, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "onchain-status":
 		_ = fs.Parse(subArgs)
-		if err := commands.NodeOnchainStatus(*node, *rpc, *contract); err != nil {
+		if err := commands.NodeOnchainStatus(*node, *rpc, *contract, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "claim":
 		_ = fs.Parse(subArgs)
-		if err := commands.NodeClaim(*privKey, *rpc, *contract); err != nil {
+		if err := commands.NodeClaim(*privKey, *rpc, *contract, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "unstake-request":
 		_ = fs.Parse(subArgs)
-		if err := commands.NodeUnstakeRequest(*privKey, *rpc, *contract); err != nil {
+		if err := commands.NodeUnstakeRequest(*privKey, *rpc, *contract, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "unstake":
 		_ = fs.Parse(subArgs)
-		if err := commands.NodeUnstake(*privKey, *rpc, *contract); err != nil {
+		if err := commands.NodeUnstake(*privKey, *rpc, *contract, *dir); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}

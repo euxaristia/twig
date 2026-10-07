@@ -106,6 +106,30 @@ func EncodeStringParameter(s string) []byte {
 	return res
 }
 
+// EncodeStringParams encodes multiple dynamic string arguments per ABI specs.
+func EncodeStringParams(strs ...string) []byte {
+	headSize := 32 * len(strs)
+	var head, tail []byte
+	offset := headSize
+	for _, s := range strs {
+		head = append(head, PadLeftBytes(big.NewInt(int64(offset)).Bytes(), 32)...)
+		enc := encodeStringData(s)
+		tail = append(tail, enc...)
+		offset += len(enc)
+	}
+	return append(head, tail...)
+}
+
+func encodeStringData(s string) []byte {
+	strBytes := []byte(s)
+	length := PadLeftBytes(big.NewInt(int64(len(strBytes))).Bytes(), 32)
+	paddedData := PadRightBytes(strBytes, ((len(strBytes)+31)/32)*32)
+	var res []byte
+	res = append(res, length...)
+	res = append(res, paddedData...)
+	return res
+}
+
 // DecodeString decodes a dynamic string from ABI return data.
 func DecodeString(data []byte, offset int) (string, error) {
 	if offset < 0 || len(data) < offset+32 {
