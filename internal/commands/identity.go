@@ -13,6 +13,26 @@ import (
 	"github.com/Twigpine/twig/internal/identity"
 )
 
+// confirmOverwrite prompts before replacing an existing identity key.
+// Confirmation is required even when force is set: replacing a key can
+// permanently lose access to the original DID. An empty or negative answer
+// aborts the operation. Returns true when the caller may proceed.
+func confirmOverwrite(in io.Reader, keyPath string, force bool, verb string) bool {
+	if force {
+		fmt.Printf("warning: --force specified. Overwriting existing identity at %s.\nThis will permanently destroy your current DID. Continue? [y/N] ", keyPath)
+	} else {
+		fmt.Printf("identity already exists at %s.\n%s will permanently replace your current DID. Continue? [y/N] ", keyPath, verb)
+	}
+	reader := bufio.NewReader(in)
+	ans, _ := reader.ReadString('\n')
+	ans = strings.TrimSpace(strings.ToLower(ans))
+	if ans != "y" && ans != "yes" {
+		fmt.Println("Aborted.")
+		return false
+	}
+	return true
+}
+
 // IdentityNew generates a new Ed25519 identity key and saves it to identity.pem.
 func IdentityNew(dirOverride string, force bool, in io.Reader) error {
 	dir, err := identity.DefaultDir(dirOverride)
@@ -22,17 +42,8 @@ func IdentityNew(dirOverride string, force bool, in io.Reader) error {
 
 	keyPath := identity.KeyPath(dir)
 	if _, err := os.Stat(keyPath); err == nil {
-		if !force {
-			fmt.Printf("identity already exists at %s.\nThis will permanently replace your current DID. Continue? [y/N] ", keyPath)
-			reader := bufio.NewReader(in)
-			ans, _ := reader.ReadString('\n')
-			ans = strings.TrimSpace(strings.ToLower(ans))
-			if ans != "y" && ans != "yes" {
-				fmt.Println("Aborted.")
-				return nil
-			}
-		} else {
-			fmt.Printf("warning: --force specified. Overwriting existing identity at %s.\n", keyPath)
+		if !confirmOverwrite(in, keyPath, force, "This") {
+			return nil
 		}
 	}
 
@@ -119,7 +130,7 @@ func IdentityBackup(dirOverride, outDest string) error {
 }
 
 // IdentityRestore restores identity.pem from a backup file.
-func IdentityRestore(dirOverride, srcPath string, force bool) error {
+func IdentityRestore(dirOverride, srcPath string, force bool, in io.Reader) error {
 	if srcPath == "" {
 		return errors.New("must specify backup source path")
 	}
@@ -140,12 +151,8 @@ func IdentityRestore(dirOverride, srcPath string, force bool) error {
 	}
 
 	dest := identity.KeyPath(dir)
-	if _, err := os.Stat(dest); err == nil && !force {
-		fmt.Printf("warning: overwriting existing identity at %s. Continue? [y/N] ", dest)
-		var ans string
-		fmt.Scanln(&ans)
-		if strings.ToLower(strings.TrimSpace(ans)) != "y" && strings.ToLower(strings.TrimSpace(ans)) != "yes" {
-			fmt.Println("Aborted.")
+	if _, err := os.Stat(dest); err == nil {
+		if !confirmOverwrite(in, dest, force, "Restoring") {
 			return nil
 		}
 	}

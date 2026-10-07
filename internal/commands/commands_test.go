@@ -49,7 +49,7 @@ func TestIdentityNewShowSignExport(t *testing.T) {
 		t.Fatalf("IdentityBackup error: %v", err)
 	}
 
-	if err := IdentityRestore(tempDir, bakPath, true); err != nil {
+	if err := IdentityRestore(tempDir, bakPath, true, strings.NewReader("y\n")); err != nil {
 		t.Fatalf("IdentityRestore error: %v", err)
 	}
 }

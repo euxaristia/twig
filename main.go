@@ -227,7 +227,7 @@ func handleIdentity(args []string) {
 			fmt.Fprintln(os.Stderr, "error: path to backup file required")
 			os.Exit(1)
 		}
-		if err := commands.IdentityRestore(*dir, tail[0], *force); err != nil {
+		if err := commands.IdentityRestore(*dir, tail[0], *force, os.Stdin); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
