@@ -128,3 +128,50 @@ func TestSolveICaptchaURLValidation(t *testing.T) {
 		t.Errorf("expected connection error for localhost http URL, got scheme error or nil: %v", err)
 	}
 }
+
+func TestClientRedirectStripsSensitiveHeaders(t *testing.T) {
+	kp, err := identity.GenerateKeypair()
+	if err != nil {
+		t.Fatalf("failed to generate keypair: %v", err)
+	}
+
+	var redirectedReq *http.Request
+	var redirectServer *httptest.Server
+
+	redirectServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/target" {
+			redirectedReq = r.Clone(r.Context())
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, redirectServer.URL+"/target", http.StatusFound)
+	}))
+	defer redirectServer.Close()
+
+	c := New(redirectServer.URL, kp)
+
+	req, err := http.NewRequest(http.MethodGet, redirectServer.URL+"/start", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Signature", "sig1=:abc:")
+	req.Header.Set("Signature-Input", "sig1=(...)")
+	req.Header.Set("Content-Digest", "sha-256=:123:")
+	req.Header.Set("x-icaptcha-proof", "proof123")
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		t.Fatalf("client.Do failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if redirectedReq == nil {
+		t.Fatalf("expected redirect target to receive request")
+	}
+
+	for _, header := range []string{"Signature", "Signature-Input", "Content-Digest", "x-icaptcha-proof"} {
+		if val := redirectedReq.Header.Get(header); val != "" {
+			t.Errorf("expected header %s to be stripped on redirect, got %q", header, val)
+		}
+	}
+}
