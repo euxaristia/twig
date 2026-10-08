@@ -68,6 +68,13 @@ func NewWithTimeout(nodeURL string, keypair *identity.Keypair, timeout time.Dura
 				if prev.URL.Scheme != req.URL.Scheme || prev.URL.Host != req.URL.Host {
 					return http.ErrUseLastResponse
 				}
+
+				// SECURITY: Strip sensitive RFC 9421 signatures and proof headers on redirects.
+				// Signatures bind @path (which changes on redirect) and proof headers should not leak.
+				req.Header.Del("Signature")
+				req.Header.Del("Signature-Input")
+				req.Header.Del("Content-Digest")
+				req.Header.Del("x-icaptcha-proof")
 			}
 			return nil
 		},
