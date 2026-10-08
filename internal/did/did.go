@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 )
 
@@ -27,64 +26,86 @@ func init() {
 }
 
 // EncodeBase58 encodes a byte slice into Bitcoin base58.
+// Optimized direct byte-slice radix conversion eliminating math/big heap allocations.
 func EncodeBase58(input []byte) string {
 	if len(input) == 0 {
 		return ""
 	}
 
-	zeros := 0
-	for zeros < len(input) && input[zeros] == 0 {
-		zeros++
+	zeroes := 0
+	for zeroes < len(input) && input[zeroes] == 0 {
+		zeroes++
 	}
 
-	n := new(big.Int).SetBytes(input)
-	radix := big.NewInt(58)
-	zero := big.NewInt(0)
-	mod := new(big.Int)
+	// log256(58) ~ 1.36566. Buffer size len(input)*138/100 + 1 is safe.
+	out := make([]byte, len(input)*138/100+1)
+	length := 0
 
-	var encoded []byte
-	for n.Cmp(zero) > 0 {
-		n.DivMod(n, radix, mod)
-		encoded = append(encoded, b58Alphabet[mod.Int64()])
+	for i := zeroes; i < len(input); i++ {
+		carry := int(input[i])
+		j := 0
+		for k := len(out) - 1; (carry != 0 || j < length) && k >= 0; k, j = k-1, j+1 {
+			carry += 256 * int(out[k])
+			out[k] = byte(carry % 58)
+			carry /= 58
+		}
+		length = j
 	}
 
-	for i := 0; i < zeros; i++ {
-		encoded = append(encoded, b58Alphabet[0])
+	start := len(out) - length
+	for start < len(out) && out[start] == 0 {
+		start++
 	}
 
-	// Reverse
-	for i, j := 0, len(encoded)-1; i < j; i, j = i+1, j-1 {
-		encoded[i], encoded[j] = encoded[j], encoded[i]
+	res := make([]byte, zeroes+(len(out)-start))
+	for i := 0; i < zeroes; i++ {
+		res[i] = b58Alphabet[0]
+	}
+	for i, d := range out[start:] {
+		res[zeroes+i] = b58Alphabet[d]
 	}
 
-	return string(encoded)
+	return string(res)
 }
 
 // DecodeBase58 decodes a Bitcoin base58 encoded string.
+// Optimized direct byte-slice radix conversion eliminating math/big heap allocations.
 func DecodeBase58(input string) ([]byte, error) {
 	if len(input) == 0 {
 		return nil, nil
 	}
 
-	zeros := 0
-	for zeros < len(input) && input[zeros] == b58Alphabet[0] {
-		zeros++
+	zeroes := 0
+	for zeroes < len(input) && input[zeroes] == b58Alphabet[0] {
+		zeroes++
 	}
 
-	n := big.NewInt(0)
-	radix := big.NewInt(58)
-	for i := zeros; i < len(input); i++ {
+	// log58(256) ~ 0.73248. Buffer size len(input)*733/1000 + 1 is safe.
+	out := make([]byte, len(input)*733/1000+1)
+	length := 0
+
+	for i := zeroes; i < len(input); i++ {
 		idx := b58Indexes[input[i]]
 		if idx == -1 {
 			return nil, fmt.Errorf("invalid base58 character: %c", input[i])
 		}
-		n.Mul(n, radix)
-		n.Add(n, big.NewInt(int64(idx)))
+		carry := idx
+		j := 0
+		for k := len(out) - 1; (carry != 0 || j < length) && k >= 0; k, j = k-1, j+1 {
+			carry += 58 * int(out[k])
+			out[k] = byte(carry & 0xff)
+			carry >>= 8
+		}
+		length = j
 	}
 
-	bytes := n.Bytes()
-	result := make([]byte, zeros+len(bytes))
-	copy(result[zeros:], bytes)
+	start := len(out) - length
+	for start < len(out) && out[start] == 0 {
+		start++
+	}
+
+	result := make([]byte, zeroes+(len(out)-start))
+	copy(result[zeroes:], out[start:])
 	return result, nil
 }
 
