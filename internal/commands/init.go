@@ -1,10 +1,12 @@
 package commands
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/did"
@@ -51,7 +53,9 @@ func Init(repoName, description, nodeURL, dirOverride string) error {
 
 	// 3. Register with node
 	nodeURL = client.ResolveNodeURL(nodeURL)
-	_ = Register(nodeURL, nil, "", dirOverride)
+	if err := Register(nodeURL, nil, "", dirOverride); err != nil {
+		return fmt.Errorf("registration failed: %w", err)
+	}
 
 	// 4. Derive repo name
 	if repoName == "" {
@@ -60,14 +64,25 @@ func Init(repoName, description, nodeURL, dirOverride string) error {
 
 	// 5. Create remote repo
 	fmt.Printf("Creating repository %s on %s...\n", repoName, nodeURL)
-	_ = RepoCreate(repoName, description, false, "main", nodeURL, dirOverride)
+	if err := RepoCreate(repoName, description, false, "main", nodeURL, dirOverride); err != nil {
+		lower := strings.ToLower(err.Error())
+		if !strings.Contains(lower, "exists") && !strings.Contains(lower, "already") {
+			return fmt.Errorf("repository creation failed: %w", err)
+		}
+		fmt.Println("  Repository already exists — continuing.")
+	}
 
-	// 6. Add remote
+	// 6. Add remote, preserving any existing remotes (never touch origin).
 	owner := did.ShortDID(kp.DID())
-	remoteURL := fmt.Sprintf("twigpine://%s/%s", owner, repoName)
-	_ = exec.Command("git", "remote", "remove", "origin").Run()
-	if err := exec.Command("git", "remote", "add", "origin", remoteURL).Run(); err != nil {
-		return fmt.Errorf("adding git remote: %w", err)
+	remoteURL := client.FormatGitURL(owner, repoName)
+	remoteName := client.GitURLScheme()
+	if out, err := exec.Command("git", "remote", "get-url", remoteName).Output(); err == nil && len(bytes.TrimSpace(out)) > 0 {
+		fmt.Printf("  Remote '%s' already set.\n", remoteName)
+	} else {
+		if err := exec.Command("git", "remote", "add", remoteName, remoteURL).Run(); err != nil {
+			return fmt.Errorf("adding git remote: %w", err)
+		}
+		fmt.Printf("  Remote added: %s\n", remoteURL)
 	}
 
 	fmt.Println("\n✓ Setup complete!")

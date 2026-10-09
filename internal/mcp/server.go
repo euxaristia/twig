@@ -303,7 +303,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 		if owner == "" {
 			owner = s.resolveOwner()
 		}
-		return fmt.Sprintf("twigpine://%s/%s", owner, repoName), nil
+		return client.FormatGitURL(owner, repoName), nil
 
 	case "agent_register":
 		if s.Keypair == nil {

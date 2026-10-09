@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 	"unicode"
@@ -27,6 +28,26 @@ const (
 	MaxICaptchaRetries  = 2
 	UserAgent           = "twig/0.7.1 twigpine-cli"
 )
+
+// GitURLScheme returns the URL scheme matching an installed git remote
+// helper: "twigpine" when git-remote-twigpine is on PATH, "gitlawb" when only
+// the legacy git-remote-gitlawb is available. Defaults to "twigpine" so
+// generated URLs keep working once the helper is installed.
+func GitURLScheme() string {
+	if _, err := exec.LookPath("git-remote-twigpine"); err == nil {
+		return "twigpine"
+	}
+	if _, err := exec.LookPath("git-remote-gitlawb"); err == nil {
+		return "gitlawb"
+	}
+	return "twigpine"
+}
+
+// FormatGitURL builds a repository git URL using the scheme of the installed
+// remote helper, so the URL is usable with the helper on PATH.
+func FormatGitURL(owner, repo string) string {
+	return fmt.Sprintf("%s://%s/%s", GitURLScheme(), owner, repo)
+}
 
 // ResolveNodeURL determines the node URL based on explicit arg, environment, or default.
 func ResolveNodeURL(explicit string) string {

@@ -25,7 +25,7 @@ func Clone(repoInput, destDir, branch, nodeURL, arweaveGateway, ipfsGateway stri
 		destDir = repoName
 	}
 
-	remoteURL := fmt.Sprintf("twigpine://%s/%s", owner, repoName)
+	remoteURL := client.FormatGitURL(owner, repoName)
 	nodeURL = client.ResolveNodeURL(nodeURL)
 
 	kp, _ := identity.LoadKeypair("")

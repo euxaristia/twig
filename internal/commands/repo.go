@@ -69,7 +69,7 @@ func RepoClonePrint(name, nodeURL, dirOverride string) error {
 		return err
 	}
 
-	fmt.Printf("git clone twigpine://%s/%s\n", owner, repoName)
+	fmt.Printf("git clone %s\n", client.FormatGitURL(owner, repoName))
 	return nil
 }
 

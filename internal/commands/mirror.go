@@ -49,7 +49,7 @@ func Mirror(source, repoNameOverride, description, nodeURL, dirOverride string) 
 	fmt.Printf("Creating repository %s on %s...\n", repoName, nodeURL)
 	_ = RepoCreate(repoName, description, false, "main", nodeURL, dirOverride)
 
-	remoteURL := fmt.Sprintf("twigpine://%s/%s", owner, repoName)
+	remoteURL := client.FormatGitURL(owner, repoName)
 	fmt.Printf("Pushing mirror to %s...\n", remoteURL)
 	pushCmd := exec.Command("git", "push", "--mirror", remoteURL)
 	pushCmd.Dir = tempDir
