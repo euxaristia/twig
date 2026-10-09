@@ -13,12 +13,17 @@ import (
 
 // Mirror mirrors a public Git repository into Twigpine.
 func Mirror(source, repoNameOverride, description, nodeURL, dirOverride string) error {
+	source = strings.TrimSpace(source)
+	source = strings.TrimRight(source, "/")
+	if strings.HasPrefix(source, "-") {
+		return fmt.Errorf("invalid repository source %q: source cannot start with '-'", source)
+	}
+
 	kp, err := EnsureIdentityExists(dirOverride)
 	if err != nil {
 		return err
 	}
 
-	source = strings.TrimRight(source, "/")
 	repoName := repoNameOverride
 	if repoName == "" {
 		base := path.Base(source)
@@ -36,7 +41,7 @@ func Mirror(source, repoNameOverride, description, nodeURL, dirOverride string) 
 	defer os.RemoveAll(tempDir)
 
 	fmt.Printf("Cloning %s into temporary mirror...\n", source)
-	cloneCmd := exec.Command("git", "clone", "--mirror", source, tempDir)
+	cloneCmd := exec.Command("git", "clone", "--mirror", "--", source, tempDir)
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
 	if err := cloneCmd.Run(); err != nil {
