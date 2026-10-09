@@ -16,6 +16,13 @@ import (
 
 // Clone clones a Twigpine repository, configuring sparse-checkout if private subtrees are withheld.
 func Clone(repoInput, destDir, branch, nodeURL, arweaveGateway, ipfsGateway string) error {
+	if strings.HasPrefix(destDir, "-") {
+		return fmt.Errorf("invalid destination directory %q: directory cannot start with '-'", destDir)
+	}
+	if strings.HasPrefix(branch, "-") {
+		return fmt.Errorf("invalid branch %q: branch cannot start with '-'", branch)
+	}
+
 	owner, repoName, err := ResolveRepoOwner(repoInput, "")
 	if err != nil {
 		return err
@@ -39,7 +46,7 @@ func Clone(repoInput, destDir, branch, nodeURL, arweaveGateway, ipfsGateway stri
 		if branch != "" {
 			args = append(args, "--branch", branch)
 		}
-		args = append(args, remoteURL, destDir)
+		args = append(args, "--", remoteURL, destDir)
 
 		cmd := exec.Command("git", args...)
 		cmd.Stdout = os.Stdout
@@ -52,7 +59,7 @@ func Clone(repoInput, destDir, branch, nodeURL, arweaveGateway, ipfsGateway stri
 
 	// Partial clone with sparse-checkout
 	fmt.Printf("Notice: repo has %d withheld private paths; configuring sparse clone\n", len(withheld))
-	cloneArgs := []string{"clone", "--filter=blob:none", "--no-checkout", remoteURL, destDir}
+	cloneArgs := []string{"clone", "--filter=blob:none", "--no-checkout", "--", remoteURL, destDir}
 	cmd := exec.Command("git", cloneArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
