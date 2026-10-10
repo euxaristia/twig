@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -80,5 +82,35 @@ func TestServerInitialize(t *testing.T) {
 
 	if resp.Result.ServerInfo.Name != "twig" {
 		t.Fatalf("expected server name 'twig', got %s", resp.Result.ServerInfo.Name)
+	}
+}
+
+func TestToolCallURLEscaping(t *testing.T) {
+	var capturedPath string
+	srv := NewServer("https://example.com", nil)
+
+	// Mock server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedPath = r.URL.String()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer ts.Close()
+
+	srv.Client.NodeURL = ts.URL
+
+	// Test repo_tree tool call with special chars
+	_, err := srv.callTool("repo_tree", map[string]interface{}{
+		"name":  "my repo",
+		"owner": "owner#1",
+		"path":  "dir/file with space&param=value",
+	})
+	if err != nil {
+		t.Fatalf("callTool error: %v", err)
+	}
+
+	expected := "/api/v1/repos/owner%231/my%20repo/tree?path=dir%2Ffile+with+space%26param%3Dvalue"
+	if capturedPath != expected {
+		t.Fatalf("expected escaped URL %q, got %q", expected, capturedPath)
 	}
 }
