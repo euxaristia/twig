@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -80,5 +82,31 @@ func TestServerInitialize(t *testing.T) {
 
 	if resp.Result.ServerInfo.Name != "twig" {
 		t.Fatalf("expected server name 'twig', got %s", resp.Result.ServerInfo.Name)
+	}
+}
+
+func TestToolCallEscaping(t *testing.T) {
+	var requestedURI string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestedURI = r.URL.RequestURI()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer ts.Close()
+
+	srv := NewServer(ts.URL, nil)
+
+	_, err := srv.callTool("repo_tree", map[string]interface{}{
+		"name":  "my/repo",
+		"owner": "user/sub",
+		"path":  "src/file.txt?a=b&c=d",
+	})
+	if err != nil {
+		t.Fatalf("callTool error: %v", err)
+	}
+
+	expectedURI := "/api/v1/repos/user%2Fsub/my%2Frepo/tree?path=src%2Ffile.txt%3Fa%3Db%26c%3Dd"
+	if requestedURI != expectedURI {
+		t.Errorf("expected requested URI %q, got %q", expectedURI, requestedURI)
 	}
 }

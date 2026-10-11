@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -257,7 +259,8 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 		if owner == "" {
 			owner = s.resolveOwner()
 		}
-		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoName))
+		// Escape URL path elements to prevent path traversal and parameter injection
+		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s", url.PathEscape(owner), url.PathEscape(repoName)))
 		if err != nil {
 			return "", err
 		}
@@ -272,7 +275,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 		if owner == "" {
 			owner = s.resolveOwner()
 		}
-		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/commits", owner, repoName))
+		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/commits", url.PathEscape(owner), url.PathEscape(repoName)))
 		if err != nil {
 			return "", err
 		}
@@ -288,7 +291,8 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 			owner = s.resolveOwner()
 		}
 		path, _ := args["path"].(string)
-		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/tree?path=%s", owner, repoName, path))
+		// Query-escape tree path parameter and path-escape owner/repo to ensure valid, safe endpoints
+		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/tree?path=%s", url.PathEscape(owner), url.PathEscape(repoName), url.QueryEscape(path)))
 		if err != nil {
 			return "", err
 		}
@@ -329,7 +333,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 
 	case "ucan_show":
 		dir, _ := identity.DefaultDir("")
-		data, err := os.ReadFile(dir + "/ucan.json")
+		data, err := os.ReadFile(filepath.Join(dir, "ucan.json"))
 		if err != nil {
 			return "", fmt.Errorf("no UCAN found: %w", err)
 		}
@@ -397,7 +401,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 			"target_branch": args["base"],
 			"body":          args["body"],
 		})
-		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", owner, name), body)
+		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", url.PathEscape(owner), url.PathEscape(name)), body)
 		if err != nil {
 			return "", err
 		}
@@ -406,7 +410,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 	case "pr_list":
 		repo, _ := args["repo"].(string)
 		owner, name := splitOwnerRepo(repo, s.resolveOwner())
-		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", owner, name))
+		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", url.PathEscape(owner), url.PathEscape(name)))
 		if err != nil {
 			return "", err
 		}
@@ -416,7 +420,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 		repo, _ := args["repo"].(string)
 		owner, name := splitOwnerRepo(repo, s.resolveOwner())
 		num := args["number"]
-		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%v", owner, name, num))
+		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%s", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(fmt.Sprintf("%v", num))))
 		if err != nil {
 			return "", err
 		}
@@ -426,7 +430,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 		repo, _ := args["repo"].(string)
 		owner, name := splitOwnerRepo(repo, s.resolveOwner())
 		num := args["number"]
-		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%v/diff", owner, name, num))
+		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%s/diff", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(fmt.Sprintf("%v", num))))
 		if err != nil {
 			return "", err
 		}
@@ -437,7 +441,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 		repo, _ := args["repo"].(string)
 		owner, name := splitOwnerRepo(repo, s.resolveOwner())
 		num := args["number"]
-		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%v/merge", owner, name, num), []byte("{}"))
+		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%s/merge", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(fmt.Sprintf("%v", num))), []byte("{}"))
 		if err != nil {
 			return "", err
 		}
@@ -460,7 +464,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 
 	case "task_claim":
 		id, _ := args["id"].(string)
-		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/tasks/%s/claim", id), []byte("{}"))
+		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/tasks/%s/claim", url.PathEscape(id)), []byte("{}"))
 		if err != nil {
 			return "", err
 		}
@@ -471,7 +475,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 		body, _ := json.Marshal(map[string]interface{}{
 			"result": args["result"],
 		})
-		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/tasks/%s/complete", id), body)
+		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/tasks/%s/complete", url.PathEscape(id)), body)
 		if err != nil {
 			return "", err
 		}
@@ -480,7 +484,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 	case "issue_list":
 		repo, _ := args["repo"].(string)
 		owner, name := splitOwnerRepo(repo, s.resolveOwner())
-		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/issues", owner, name))
+		resp, err := s.Client.Get(fmt.Sprintf("/api/v1/repos/%s/%s/issues", url.PathEscape(owner), url.PathEscape(name)))
 		if err != nil {
 			return "", err
 		}
@@ -493,7 +497,7 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 			"title": args["title"],
 			"body":  args["body"],
 		})
-		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/repos/%s/%s/issues", owner, name), body)
+		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/repos/%s/%s/issues", url.PathEscape(owner), url.PathEscape(name)), body)
 		if err != nil {
 			return "", err
 		}
