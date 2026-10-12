@@ -80,4 +80,37 @@ func TestUcanExpiration(t *testing.T) {
 	if !token.IsExpired() {
 		t.Fatalf("expected token to be expired")
 	}
+	if token.IsValid() {
+		t.Fatalf("expired token should not be valid")
+	}
+}
+
+func TestUcanNotBefore(t *testing.T) {
+	kp, err := identity.GenerateKeypair()
+	if err != nil {
+		t.Fatalf("generate keypair failed: %v", err)
+	}
+
+	futureNbf := time.Now().Add(1 * time.Hour).Unix()
+	exp := time.Now().Add(2 * time.Hour)
+
+	token, err := Issue(
+		kp,
+		kp.DID(),
+		[]Capability{{With: "*", Can: "*"}},
+		&exp,
+	)
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	token.Payload.Nbf = &futureNbf
+
+	if !token.IsBeforeValid() {
+		t.Fatalf("expected token with future nbf to return true for IsBeforeValid()")
+	}
+
+	if token.IsValid() {
+		t.Fatalf("expected token with future nbf to return false for IsValid()")
+	}
 }

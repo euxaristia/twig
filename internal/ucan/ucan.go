@@ -108,6 +108,11 @@ func (u *Ucan) IsBeforeValid() bool {
 	return time.Now().Unix() < *u.Payload.Nbf
 }
 
+// IsValid returns true if signature is valid, token is not expired, and not before date has passed.
+func (u *Ucan) IsValid() bool {
+	return u.VerifySignature() == nil && !u.IsExpired() && !u.IsBeforeValid()
+}
+
 // VerifySignature validates the cryptographic Ed25519 signature of the UCAN token.
 func (u *Ucan) VerifySignature() error {
 	pubKey, err := did.ToVerifyingKey(u.Payload.Iss)

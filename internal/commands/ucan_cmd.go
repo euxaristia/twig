@@ -79,16 +79,19 @@ func UcanVerify(tokenInput string) error {
 
 	sigErr := token.VerifySignature()
 	isExp := token.IsExpired()
-	valid := (sigErr == nil && !isExp)
+	isNotYetValid := token.IsBeforeValid()
+	valid := token.IsValid()
 
 	out := map[string]interface{}{
 		"valid":           valid,
 		"signature_valid": sigErr == nil,
 		"expired":         isExp,
+		"not_yet_valid":   isNotYetValid,
 		"issuer":          token.Payload.Iss,
 		"audience":        token.Payload.Aud,
 		"capabilities":    token.Payload.Att,
 		"expires":         token.Payload.Exp,
+		"not_before":      token.Payload.Nbf,
 	}
 
 	bytes, _ := json.MarshalIndent(out, "", "  ")
@@ -100,6 +103,9 @@ func UcanVerify(tokenInput string) error {
 		}
 		if isExp {
 			return fmt.Errorf("UCAN token has expired")
+		}
+		if isNotYetValid {
+			return fmt.Errorf("UCAN token is not yet valid (nbf claim in future)")
 		}
 	}
 
