@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 )
 
@@ -26,7 +25,8 @@ func init() {
 	}
 }
 
-// EncodeBase58 encodes a byte slice into Bitcoin base58.
+// EncodeBase58 encodes a byte slice into Bitcoin base58 without using heavy math/big.Int allocations.
+// Uses stack buffers for small payloads (such as 34-byte public key multicodec values) to minimize heap allocations.
 func EncodeBase58(input []byte) string {
 	if len(input) == 0 {
 		return ""
@@ -37,30 +37,54 @@ func EncodeBase58(input []byte) string {
 		zeros++
 	}
 
-	n := new(big.Int).SetBytes(input)
-	radix := big.NewInt(58)
-	zero := big.NewInt(0)
-	mod := new(big.Int)
+	// log2(256) / log2(58) ≈ 1.3658, scale by 138/100 + 1
+	size := (len(input)-zeros)*138/100 + 1
+	var buf [128]byte
+	var out []byte
+	if size <= len(buf) {
+		out = buf[:size]
+	} else {
+		out = make([]byte, size)
+	}
 
-	var encoded []byte
-	for n.Cmp(zero) > 0 {
-		n.DivMod(n, radix, mod)
-		encoded = append(encoded, b58Alphabet[mod.Int64()])
+	length := 0
+	for _, b := range input[zeros:] {
+		carry := uint32(b)
+		for i := 0; i < length; i++ {
+			carry += uint32(out[len(out)-1-i]) * 256
+			out[len(out)-1-i] = byte(carry % 58)
+			carry /= 58
+		}
+		for carry > 0 {
+			length++
+			out[len(out)-length] = byte(carry % 58)
+			carry /= 58
+		}
+	}
+
+	start := len(out) - length
+
+	resSize := zeros + (len(out) - start)
+	var resBuf [128]byte
+	var result []byte
+	if resSize <= len(resBuf) {
+		result = resBuf[:0]
+	} else {
+		result = make([]byte, 0, resSize)
 	}
 
 	for i := 0; i < zeros; i++ {
-		encoded = append(encoded, b58Alphabet[0])
+		result = append(result, b58Alphabet[0])
+	}
+	for i := start; i < len(out); i++ {
+		result = append(result, b58Alphabet[out[i]])
 	}
 
-	// Reverse
-	for i, j := 0, len(encoded)-1; i < j; i, j = i+1, j-1 {
-		encoded[i], encoded[j] = encoded[j], encoded[i]
-	}
-
-	return string(encoded)
+	return string(result)
 }
 
-// DecodeBase58 decodes a Bitcoin base58 encoded string.
+// DecodeBase58 decodes a Bitcoin base58 encoded string without using heavy math/big.Int allocations.
+// Uses stack buffers for small inputs to avoid unnecessary memory allocations.
 func DecodeBase58(input string) ([]byte, error) {
 	if len(input) == 0 {
 		return nil, nil
@@ -71,20 +95,39 @@ func DecodeBase58(input string) ([]byte, error) {
 		zeros++
 	}
 
-	n := big.NewInt(0)
-	radix := big.NewInt(58)
-	for i := zeros; i < len(input); i++ {
-		idx := b58Indexes[input[i]]
-		if idx == -1 {
-			return nil, fmt.Errorf("invalid base58 character: %c", input[i])
-		}
-		n.Mul(n, radix)
-		n.Add(n, big.NewInt(int64(idx)))
+	// log2(58) / log2(256) ≈ 0.7324, scale by 733/1000 + 1
+	size := (len(input)-zeros)*733/1000 + 1
+	var buf [128]byte
+	var out []byte
+	if size <= len(buf) {
+		out = buf[:size]
+	} else {
+		out = make([]byte, size)
 	}
 
-	bytes := n.Bytes()
-	result := make([]byte, zeros+len(bytes))
-	copy(result[zeros:], bytes)
+	length := 0
+	for i := zeros; i < len(input); i++ {
+		c := input[i]
+		idx := b58Indexes[c]
+		if idx == -1 {
+			return nil, fmt.Errorf("invalid base58 character: %c", c)
+		}
+		carry := uint32(idx)
+		for j := 0; j < length; j++ {
+			carry += uint32(out[len(out)-1-j]) * 58
+			out[len(out)-1-j] = byte(carry & 0xff)
+			carry >>= 8
+		}
+		for carry > 0 {
+			length++
+			out[len(out)-length] = byte(carry & 0xff)
+			carry >>= 8
+		}
+	}
+
+	start := len(out) - length
+	result := make([]byte, zeros+(len(out)-start))
+	copy(result[zeros:], out[start:])
 	return result, nil
 }
 
