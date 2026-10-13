@@ -171,5 +171,8 @@ func SaveKeypair(dir string, keypair *Keypair) error {
 	if err := os.WriteFile(path, pemBytes, 0600); err != nil {
 		return fmt.Errorf("failed to write key file: %w", err)
 	}
+	if err := os.Chmod(path, 0600); err != nil {
+		return fmt.Errorf("failed to enforce key file permissions: %w", err)
+	}
 	return nil
 }

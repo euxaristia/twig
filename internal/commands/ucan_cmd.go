@@ -37,8 +37,11 @@ func UcanDelegate(toDID, resource, action string, expiryHours int, outPath, dirO
 	}
 
 	if outPath != "" {
-		if err := os.WriteFile(outPath, []byte(encoded), 0644); err != nil {
+		if err := os.WriteFile(outPath, []byte(encoded), 0600); err != nil {
 			return fmt.Errorf("writing UCAN file: %w", err)
+		}
+		if err := os.Chmod(outPath, 0600); err != nil {
+			return fmt.Errorf("setting permissions on UCAN file: %w", err)
 		}
 		fmt.Printf("✓ UCAN token saved to %s\n", outPath)
 		return nil

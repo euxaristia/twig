@@ -48,9 +48,64 @@ func TestIdentityNewShowSignExport(t *testing.T) {
 	if err := IdentityBackup(tempDir, bakPath); err != nil {
 		t.Fatalf("IdentityBackup error: %v", err)
 	}
+	bakInfo, err := os.Stat(bakPath)
+	if err != nil {
+		t.Fatalf("stat bakPath failed: %v", err)
+	}
+	if perm := bakInfo.Mode().Perm(); perm != 0600 {
+		t.Errorf("IdentityBackup file perm = %o, want 0600", perm)
+	}
 
 	if err := IdentityRestore(tempDir, bakPath, true, strings.NewReader("y\n")); err != nil {
 		t.Fatalf("IdentityRestore error: %v", err)
+	}
+}
+
+func TestUcanDelegateFilePermissions(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "twig-test-ucan-*")
+	if err != nil {
+		t.Fatalf("tempdir failed: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	var stdin bytes.Buffer
+	if err := IdentityNew(tempDir, false, &stdin); err != nil {
+		t.Fatalf("IdentityNew error: %v", err)
+	}
+
+	outPath := filepath.Join(tempDir, "delegated_ucan.json")
+
+	// Test 1: New file creation
+	if err := UcanDelegate("did:key:z6Mkq...", "repo/1", "git:push", 24, outPath, tempDir, false); err != nil {
+		t.Fatalf("UcanDelegate error: %v", err)
+	}
+
+	info, err := os.Stat(outPath)
+	if err != nil {
+		t.Fatalf("stat failed: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0600 {
+		t.Errorf("UcanDelegate file perm = %o, want 0600", perm)
+	}
+
+	// Test 2: Pre-existing file with loose permissions (0666 / 0644)
+	if err := os.WriteFile(outPath, []byte("loose data"), 0666); err != nil {
+		t.Fatalf("failed writing loose file: %v", err)
+	}
+	if err := os.Chmod(outPath, 0666); err != nil {
+		t.Fatalf("failed setting loose permissions: %v", err)
+	}
+
+	if err := UcanDelegate("did:key:z6Mkq...", "repo/1", "git:push", 24, outPath, tempDir, false); err != nil {
+		t.Fatalf("UcanDelegate overwrite error: %v", err)
+	}
+
+	infoOverwritten, err := os.Stat(outPath)
+	if err != nil {
+		t.Fatalf("stat failed: %v", err)
+	}
+	if perm := infoOverwritten.Mode().Perm(); perm != 0600 {
+		t.Errorf("UcanDelegate overwritten file perm = %o, want 0600", perm)
 	}
 }
 

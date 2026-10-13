@@ -81,6 +81,7 @@ func Register(nodeURL string, capabilities []string, model, dirOverride string) 
 		}
 		recordBytes, _ := json.MarshalIndent(record, "", "  ")
 		_ = os.WriteFile(ucanPath, recordBytes, 0600)
+		_ = os.Chmod(ucanPath, 0600)
 	}
 
 	trustScore := 0.0

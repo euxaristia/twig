@@ -123,6 +123,9 @@ func IdentityBackup(dirOverride, outDest string) error {
 	if err := os.WriteFile(outDest, data, 0600); err != nil {
 		return fmt.Errorf("writing backup file: %w", err)
 	}
+	if err := os.Chmod(outDest, 0600); err != nil {
+		return fmt.Errorf("enforcing backup file permissions: %w", err)
+	}
 
 	abs, _ := filepath.Abs(outDest)
 	fmt.Printf("✓ Identity backed up to %s\n", abs)
