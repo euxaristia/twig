@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -48,12 +49,14 @@ func TestIdentityNewShowSignExport(t *testing.T) {
 	if err := IdentityBackup(tempDir, bakPath); err != nil {
 		t.Fatalf("IdentityBackup error: %v", err)
 	}
-	bakInfo, err := os.Stat(bakPath)
-	if err != nil {
-		t.Fatalf("stat bakPath failed: %v", err)
-	}
-	if perm := bakInfo.Mode().Perm(); perm != 0600 {
-		t.Errorf("IdentityBackup file perm = %o, want 0600", perm)
+	if runtime.GOOS != "windows" {
+		bakInfo, err := os.Stat(bakPath)
+		if err != nil {
+			t.Fatalf("stat bakPath failed: %v", err)
+		}
+		if perm := bakInfo.Mode().Perm(); perm != 0600 {
+			t.Errorf("IdentityBackup file perm = %o, want 0600", perm)
+		}
 	}
 
 	if err := IdentityRestore(tempDir, bakPath, true, strings.NewReader("y\n")); err != nil {
@@ -80,12 +83,14 @@ func TestUcanDelegateFilePermissions(t *testing.T) {
 		t.Fatalf("UcanDelegate error: %v", err)
 	}
 
-	info, err := os.Stat(outPath)
-	if err != nil {
-		t.Fatalf("stat failed: %v", err)
-	}
-	if perm := info.Mode().Perm(); perm != 0600 {
-		t.Errorf("UcanDelegate file perm = %o, want 0600", perm)
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(outPath)
+		if err != nil {
+			t.Fatalf("stat failed: %v", err)
+		}
+		if perm := info.Mode().Perm(); perm != 0600 {
+			t.Errorf("UcanDelegate file perm = %o, want 0600", perm)
+		}
 	}
 
 	// Test 2: Pre-existing file with loose permissions (0666 / 0644)
@@ -100,12 +105,14 @@ func TestUcanDelegateFilePermissions(t *testing.T) {
 		t.Fatalf("UcanDelegate overwrite error: %v", err)
 	}
 
-	infoOverwritten, err := os.Stat(outPath)
-	if err != nil {
-		t.Fatalf("stat failed: %v", err)
-	}
-	if perm := infoOverwritten.Mode().Perm(); perm != 0600 {
-		t.Errorf("UcanDelegate overwritten file perm = %o, want 0600", perm)
+	if runtime.GOOS != "windows" {
+		infoOverwritten, err := os.Stat(outPath)
+		if err != nil {
+			t.Fatalf("stat failed: %v", err)
+		}
+		if perm := infoOverwritten.Mode().Perm(); perm != 0600 {
+			t.Errorf("UcanDelegate overwritten file perm = %o, want 0600", perm)
+		}
 	}
 }
 
