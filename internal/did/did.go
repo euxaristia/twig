@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 )
 
@@ -27,6 +26,7 @@ func init() {
 }
 
 // EncodeBase58 encodes a byte slice into Bitcoin base58.
+// Optimized base conversion without math/big to avoid heap allocations and big integer arithmetic overhead.
 func EncodeBase58(input []byte) string {
 	if len(input) == 0 {
 		return ""
@@ -37,30 +37,49 @@ func EncodeBase58(input []byte) string {
 		zeros++
 	}
 
-	n := new(big.Int).SetBytes(input)
-	radix := big.NewInt(58)
-	zero := big.NewInt(0)
-	mod := new(big.Int)
-
-	var encoded []byte
-	for n.Cmp(zero) > 0 {
-		n.DivMod(n, radix, mod)
-		encoded = append(encoded, b58Alphabet[mod.Int64()])
+	// log(256) / log(58) ≈ 1.3656
+	size := (len(input)-zeros)*138/100 + 1
+	var buf [128]byte
+	var b58 []byte
+	if size <= len(buf) {
+		b58 = buf[:size]
+	} else {
+		b58 = make([]byte, size)
 	}
 
+	length := 0
+	for _, b := range input[zeros:] {
+		carry := uint32(b)
+		i := 0
+		for it := size - 1; (carry != 0 || i < length) && it >= 0; it-- {
+			carry += 256 * uint32(b58[it])
+			b58[it] = byte(carry % 58)
+			carry /= 58
+			i++
+		}
+		length = i
+	}
+
+	it := size - length
+	for it < size && b58[it] == 0 {
+		it++
+	}
+
+	result := make([]byte, zeros+(size-it))
 	for i := 0; i < zeros; i++ {
-		encoded = append(encoded, b58Alphabet[0])
+		result[i] = b58Alphabet[0]
+	}
+	p := zeros
+	for ; it < size; it++ {
+		result[p] = b58Alphabet[b58[it]]
+		p++
 	}
 
-	// Reverse
-	for i, j := 0, len(encoded)-1; i < j; i, j = i+1, j-1 {
-		encoded[i], encoded[j] = encoded[j], encoded[i]
-	}
-
-	return string(encoded)
+	return string(result)
 }
 
 // DecodeBase58 decodes a Bitcoin base58 encoded string.
+// Optimized base conversion without math/big to avoid heap allocations and big integer arithmetic overhead.
 func DecodeBase58(input string) ([]byte, error) {
 	if len(input) == 0 {
 		return nil, nil
@@ -71,31 +90,56 @@ func DecodeBase58(input string) ([]byte, error) {
 		zeros++
 	}
 
-	n := big.NewInt(0)
-	radix := big.NewInt(58)
+	// log(58) / log(256) ≈ 0.7324
+	size := (len(input)-zeros)*733/1000 + 1
+	var buf [128]byte
+	var bin []byte
+	if size <= len(buf) {
+		bin = buf[:size]
+	} else {
+		bin = make([]byte, size)
+	}
+
+	length := 0
 	for i := zeros; i < len(input); i++ {
 		idx := b58Indexes[input[i]]
 		if idx == -1 {
 			return nil, fmt.Errorf("invalid base58 character: %c", input[i])
 		}
-		n.Mul(n, radix)
-		n.Add(n, big.NewInt(int64(idx)))
+
+		carry := uint32(idx)
+		j := 0
+		for it := size - 1; (carry != 0 || j < length) && it >= 0; it-- {
+			carry += 58 * uint32(bin[it])
+			bin[it] = byte(carry & 0xff)
+			carry >>= 8
+			j++
+		}
+		length = j
 	}
 
-	bytes := n.Bytes()
-	result := make([]byte, zeros+len(bytes))
-	copy(result[zeros:], bytes)
+	it := size - length
+	for it < size && bin[it] == 0 {
+		it++
+	}
+
+	result := make([]byte, zeros+(size-it))
+	copy(result[zeros:], bin[it:])
 	return result, nil
 }
 
 // FromVerifyingKey constructs a did:key string from an Ed25519 public key.
 func FromVerifyingKey(pubKey ed25519.PublicKey) string {
+	if len(pubKey) == ed25519.PublicKeySize {
+		var prefixed [34]byte
+		copy(prefixed[:], ed25519Multicodec)
+		copy(prefixed[len(ed25519Multicodec):], pubKey)
+		return "did:key:z" + EncodeBase58(prefixed[:])
+	}
 	prefixed := make([]byte, 0, len(ed25519Multicodec)+len(pubKey))
 	prefixed = append(prefixed, ed25519Multicodec...)
 	prefixed = append(prefixed, pubKey...)
-
-	encoded := EncodeBase58(prefixed)
-	return fmt.Sprintf("did:key:z%s", encoded)
+	return "did:key:z" + EncodeBase58(prefixed)
 }
 
 // ToVerifyingKey extracts the Ed25519 public key from a did:key string.
