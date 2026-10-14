@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -153,7 +154,7 @@ func NameResolveDID(targetDID, rpcURL, contractAddr string) error {
 	return nil
 }
 
-// NameRegister reports the registration parameters and submits registration.
+// NameRegister submits the name registration transaction and waits for confirmation.
 func NameRegister(name, privateKey, rpcURL, contractAddr, dirOverride string) error {
 	kp, err := EnsureIdentityExists(dirOverride)
 	if err != nil {
@@ -178,11 +179,21 @@ func NameRegister(name, privateKey, rpcURL, contractAddr, dirOverride string) er
 		return fmt.Errorf("private key required for on-chain write (set --private-key or ETH_PRIVATE_KEY)")
 	}
 
-	fmt.Printf("✓ Name '%s' registered for %s\n", name, d)
+	data := append(evm.EncodeFunctionSignature("register(string,string)"), evm.EncodeStringParams(name, d)...)
+	receipt, err := evm.CallContract(rpcURL, privateKey, contractAddr, data)
+	if err != nil {
+		return fmt.Errorf("name registration failed: %w", err)
+	}
+
+	fmt.Println()
+	fmt.Printf("✓ '%s' is yours on Base L2\n", name)
+	fmt.Printf("  DID:   %s\n", d)
+	fmt.Printf("  Block: %d\n", receipt.BlockNumber)
+	fmt.Printf("  Tx:    %s\n", receipt.TxHash)
 	return nil
 }
 
-// NameRegisterDID registers a DID document on-chain.
+// NameRegisterDID anchors a DID document on-chain and waits for confirmation.
 func NameRegisterDID(privateKey, rpcURL, contractAddr, dirOverride string) error {
 	kp, err := EnsureIdentityExists(dirOverride)
 	if err != nil {
@@ -198,6 +209,10 @@ func NameRegisterDID(privateKey, rpcURL, contractAddr, dirOverride string) error
 
 	d := kp.DID()
 	doc := did.NewDIDDocument(d)
+	docBytes, err := json.Marshal(doc)
+	if err != nil {
+		return fmt.Errorf("encoding DID document: %w", err)
+	}
 
 	fmt.Println("Anchoring DID on Base L2...")
 	fmt.Printf("  DID:      %s\n", d)
@@ -208,7 +223,14 @@ func NameRegisterDID(privateKey, rpcURL, contractAddr, dirOverride string) error
 		return fmt.Errorf("private key required for on-chain write (set --private-key or ETH_PRIVATE_KEY)")
 	}
 
-	fmt.Printf("✓ Anchored DID Document for %s: %s#%s\n", d, d, did.ShortDID(d))
-	_ = doc
+	data := append(evm.EncodeFunctionSignature("register(string,string)"), evm.EncodeStringParams(d, string(docBytes))...)
+	receipt, err := evm.CallContract(rpcURL, privateKey, contractAddr, data)
+	if err != nil {
+		return fmt.Errorf("DID anchoring failed: %w", err)
+	}
+
+	fmt.Printf("✓ Anchored DID Document for %s\n", d)
+	fmt.Printf("  Block: %d\n", receipt.BlockNumber)
+	fmt.Printf("  Tx:    %s\n", receipt.TxHash)
 	return nil
 }
