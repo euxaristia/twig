@@ -64,3 +64,38 @@ func TestDIDDocument(t *testing.T) {
 		t.Fatalf("expected 1 verification method")
 	}
 }
+
+func BenchmarkEncodeBase58(b *testing.B) {
+	input := []byte{0xed, 0x01, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = EncodeBase58(input)
+	}
+}
+
+func BenchmarkDecodeBase58(b *testing.B) {
+	input := "z6MkrRztzc985Jm8Bjq2nKusVniF6oatDiWtkoxv4JWJZ4Uq"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = DecodeBase58(input[1:])
+	}
+}
+
+func BenchmarkFromVerifyingKey(b *testing.B) {
+	pub := ed25519.PublicKey(make([]byte, 32))
+	for i := 0; i < 32; i++ {
+		pub[i] = byte(i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = FromVerifyingKey(pub)
+	}
+}
+
+func BenchmarkToVerifyingKey(b *testing.B) {
+	did := "did:key:z6MkrRztzc985Jm8Bjq2nKusVniF6oatDiWtkoxv4JWJZ4Uq"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = ToVerifyingKey(did)
+	}
+}
