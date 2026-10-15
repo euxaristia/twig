@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/Twigpine/twig/internal/client"
@@ -38,7 +39,7 @@ func WebhookCreate(repoInput, webhookURL, events, secret, nodeURL, dirOverride s
 		"secret": secret,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/webhooks", owner, name), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/webhooks", url.PathEscape(owner), url.PathEscape(name)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("creating webhook: %w", err)
 	}
@@ -61,7 +62,7 @@ func WebhookList(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/webhooks", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/webhooks", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("listing webhooks: %w", err)
 	}
@@ -84,7 +85,7 @@ func WebhookDelete(repoInput, webhookID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Delete(fmt.Sprintf("/api/v1/repos/%s/%s/webhooks/%s", owner, name, webhookID), []byte("{}"))
+	resp, err := c.Delete(fmt.Sprintf("/api/v1/repos/%s/%s/webhooks/%s", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(webhookID)), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("deleting webhook: %w", err)
 	}
