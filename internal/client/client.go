@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/bits"
 	"net"
 	"net/http"
 	"net/url"
@@ -289,21 +290,17 @@ func (c *NodeClient) solveICaptcha(srvURL, levelStr string) (string, error) {
 }
 
 func countLeadingZeroBits(data []byte) int {
-	bits := 0
+	total := 0
 	for _, b := range data {
 		if b == 0 {
-			bits += 8
+			total += 8
 		} else {
-			for i := 7; i >= 0; i-- {
-				if (b & (1 << i)) == 0 {
-					bits++
-				} else {
-					return bits
-				}
-			}
+			// Optimized using math/bits.LeadingZeros8 for fast hardware-accelerated bit counting.
+			total += bits.LeadingZeros8(b)
+			return total
 		}
 	}
-	return bits
+	return total
 }
 
 // CappedBody contains the result of reading a bounded response body.
