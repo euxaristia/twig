@@ -72,6 +72,18 @@ func TestSolveICaptchaPow(t *testing.T) {
 	}
 }
 
+func BenchmarkSolveICaptchaPow(b *testing.B) {
+	p := &icaptchaPow{Algorithm: icaptchaPowAlgo, Challenge: "test-challenge-12345", Difficulty: 16}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := solveICaptchaPow(p)
+		if err != nil {
+			b.Fatalf("solveICaptchaPow failed: %v", err)
+		}
+	}
+}
+
 // mockICaptcha serves the challenge/answer protocol and records requests.
 type mockICaptcha struct {
 	t               *testing.T

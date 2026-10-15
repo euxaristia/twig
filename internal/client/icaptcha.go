@@ -157,11 +157,20 @@ func solveICaptchaPow(p *icaptchaPow) (string, error) {
 	if p.Difficulty == 0 {
 		return "0", nil
 	}
+
+	// Optimized: Construct buffer once and use strconv.AppendUint to append hex
+	// iteration nonces directly onto the slice without heap allocations per iteration.
+	buf := make([]byte, len(p.Challenge)+1, len(p.Challenge)+1+16)
+	copy(buf, p.Challenge)
+	buf[len(p.Challenge)] = ':'
+
+	prefixLen := len(buf)
+
 	for i := 0; i < icaptchaPowMaxIters; i++ {
-		nonce := fmt.Sprintf("%x", i)
-		hash := sha256.Sum256([]byte(p.Challenge + ":" + nonce))
+		buf = strconv.AppendUint(buf[:prefixLen], uint64(i), 16)
+		hash := sha256.Sum256(buf)
 		if countLeadingZeroBits(hash[:]) >= p.Difficulty {
-			return nonce, nil
+			return string(buf[prefixLen:]), nil
 		}
 	}
 	return "", fmt.Errorf("iCaptcha PoW not solved within iteration cap (difficulty %d)", p.Difficulty)
