@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/Twigpine/twig/internal/client"
 )
@@ -47,7 +48,7 @@ func PeerPing(targetDID, nodeURL string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, nil)
 
-	resp, err := c.Get(fmt.Sprintf("/api/v1/peers/%s/ping", targetDID))
+	resp, err := c.Get(fmt.Sprintf("/api/v1/peers/%s/ping", url.PathEscape(targetDID)))
 	if err != nil {
 		return fmt.Errorf("pinging peer: %w", err)
 	}
@@ -60,7 +61,7 @@ func PeerResolve(targetDID, nodeURL string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, nil)
 
-	resp, err := c.Get(fmt.Sprintf("/api/v1/peers/%s", targetDID))
+	resp, err := c.Get(fmt.Sprintf("/api/v1/peers/%s", url.PathEscape(targetDID)))
 	if err != nil {
 		return fmt.Errorf("resolving peer: %w", err)
 	}

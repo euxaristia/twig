@@ -39,7 +39,7 @@ func BountyCreate(repoInput, title string, amount int64, issueID, txHash string,
 	}
 
 	bodyBytes, _ := json.Marshal(body)
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/bounties", owner, name), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/bounties", url.PathEscape(owner), url.PathEscape(name)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("creating bounty: %w", err)
 	}
@@ -79,7 +79,7 @@ func BountyShow(bountyID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/bounties/%s", bountyID))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/bounties/%s", url.PathEscape(bountyID)))
 	if err != nil {
 		return fmt.Errorf("fetching bounty: %w", err)
 	}
@@ -101,7 +101,7 @@ func BountyClaim(bountyID, wallet, nodeURL, dirOverride string) error {
 		"wallet": wallet,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/bounties/%s/claim", bountyID), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/bounties/%s/claim", url.PathEscape(bountyID)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("claiming bounty: %w", err)
 	}
@@ -123,7 +123,7 @@ func BountySubmit(bountyID, prID, nodeURL, dirOverride string) error {
 		"pr_id": prID,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/bounties/%s/submit", bountyID), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/bounties/%s/submit", url.PathEscape(bountyID)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("submitting bounty work: %w", err)
 	}
@@ -141,7 +141,7 @@ func BountyApprove(bountyID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/bounties/%s/approve", bountyID), []byte("{}"))
+	resp, err := c.Post(fmt.Sprintf("/api/v1/bounties/%s/approve", url.PathEscape(bountyID)), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("approving bounty: %w", err)
 	}
@@ -159,7 +159,7 @@ func BountyCancel(bountyID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/bounties/%s/cancel", bountyID), []byte("{}"))
+	resp, err := c.Post(fmt.Sprintf("/api/v1/bounties/%s/cancel", url.PathEscape(bountyID)), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("cancelling bounty: %w", err)
 	}

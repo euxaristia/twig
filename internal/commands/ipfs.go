@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/Twigpine/twig/internal/client"
@@ -31,9 +32,9 @@ func IpfsGet(cid, nodeURL, dirOverride, scanToken string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	path := fmt.Sprintf("/api/v1/ipfs/objects/%s", cid)
+	path := fmt.Sprintf("/api/v1/ipfs/objects/%s", url.PathEscape(cid))
 	if scanToken != "" {
-		path += "?scan=" + scanToken
+		path += "?scan=" + url.QueryEscape(scanToken)
 	}
 
 	resp, err := c.GetAuthed(path)

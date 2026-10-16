@@ -216,3 +216,71 @@ func TestParseTwigpineURLVectors(t *testing.T) {
 		t.Errorf("expected false for missing slash")
 	}
 }
+
+func TestURLPathEscapingInCommands(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "twig-test-escaped-*")
+	if err != nil {
+		t.Fatalf("tempdir failed: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	var in bytes.Buffer
+	if err := IdentityNew(tempDir, true, &in); err != nil {
+		t.Fatalf("IdentityNew failed: %v", err)
+	}
+
+	var requestedRawPaths []string
+	var requestedRawQueries []string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rawPath := r.URL.RawPath
+		if rawPath == "" {
+			rawPath = r.URL.Path
+		}
+		requestedRawPaths = append(requestedRawPaths, rawPath)
+		requestedRawQueries = append(requestedRawQueries, r.URL.RawQuery)
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer srv.Close()
+
+	// 1. Test IssueShow with path traversal in owner/name/issueID
+	_ = IssueShow("owner/repo#name", "../1/close", srv.URL, tempDir)
+	if len(requestedRawPaths) == 0 {
+		t.Fatal("expected request for IssueShow")
+	}
+	lastPath := requestedRawPaths[len(requestedRawPaths)-1]
+	wantSub := "/api/v1/repos/owner/repo%23name/issues/..%2F1%2Fclose"
+	if lastPath != wantSub {
+		t.Errorf("IssueShow path = %q, want %q", lastPath, wantSub)
+	}
+
+	// 2. Test ProtectSet with slash in branch
+	_ = ProtectSet("feat/subbranch", "owner/repo", srv.URL, tempDir)
+	lastPath = requestedRawPaths[len(requestedRawPaths)-1]
+	wantSub = "/api/v1/repos/owner/repo/branches/feat%2Fsubbranch/protect"
+	if lastPath != wantSub {
+		t.Errorf("ProtectSet path = %q, want %q", lastPath, wantSub)
+	}
+
+	// 3. Test AgentShow with slash in targetDID
+	_ = AgentShow("did:key:123/sub", srv.URL)
+	lastPath = requestedRawPaths[len(requestedRawPaths)-1]
+	wantSub = "/api/v1/agents/did:key:123%2Fsub"
+	if lastPath != wantSub {
+		t.Errorf("AgentShow path = %q, want %q", lastPath, wantSub)
+	}
+
+	// 4. Test IpfsGet with scan token escaping
+	_ = IpfsGet("cid/123", srv.URL, tempDir, "token&admin=true")
+	lastPath = requestedRawPaths[len(requestedRawPaths)-1]
+	wantSub = "/api/v1/ipfs/objects/cid%2F123"
+	if lastPath != wantSub {
+		t.Errorf("IpfsGet path = %q, want %q", lastPath, wantSub)
+	}
+	lastQuery := requestedRawQueries[len(requestedRawQueries)-1]
+	if lastQuery != "scan=token%26admin%3Dtrue" {
+		t.Errorf("IpfsGet query = %q, want %q", lastQuery, "scan=token%26admin%3Dtrue")
+	}
+}

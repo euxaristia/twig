@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/identity"
@@ -28,7 +29,7 @@ func IssueCreate(repoInput, title, body, nodeURL, dirOverride string) error {
 		"body":  body,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/issues", owner, name), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/issues", url.PathEscape(owner), url.PathEscape(name)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("creating issue: %w", err)
 	}
@@ -47,7 +48,7 @@ func IssueList(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/issues", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/issues", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("listing issues: %w", err)
 	}
@@ -66,7 +67,7 @@ func IssueShow(repoInput, issueID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/issues/%s", owner, name, issueID))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/issues/%s", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(issueID)))
 	if err != nil {
 		return fmt.Errorf("fetching issue: %w", err)
 	}
@@ -89,7 +90,7 @@ func IssueClose(repoInput, issueID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/issues/%s/close", owner, name, issueID), []byte("{}"))
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/issues/%s/close", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(issueID)), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("closing issue: %w", err)
 	}
@@ -116,7 +117,7 @@ func IssueComment(repoInput, issueID, body, nodeURL, dirOverride string) error {
 		"body": body,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/issues/%s/comments", owner, name, issueID), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/issues/%s/comments", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(issueID)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("commenting on issue: %w", err)
 	}
@@ -135,7 +136,7 @@ func IssueComments(repoInput, issueID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/issues/%s/comments", owner, name, issueID))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/issues/%s/comments", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(issueID)))
 	if err != nil {
 		return fmt.Errorf("fetching comments: %w", err)
 	}
