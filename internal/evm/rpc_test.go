@@ -104,3 +104,39 @@ func TestABIDecodeMalformedData(t *testing.T) {
 		t.Errorf("expected error for out-of-bounds string length in DecodeString")
 	}
 }
+
+func TestPadLeftAndRightBytes(t *testing.T) {
+	input := []byte{0x12, 0x34}
+	paddedLeft := PadLeftBytes(input, 4)
+	if len(paddedLeft) != 4 || paddedLeft[0] != 0 || paddedLeft[1] != 0 || paddedLeft[2] != 0x12 || paddedLeft[3] != 0x34 {
+		t.Fatalf("unexpected PadLeftBytes output: %x", paddedLeft)
+	}
+
+	paddedRight := PadRightBytes(input, 4)
+	if len(paddedRight) != 4 || paddedRight[0] != 0x12 || paddedRight[1] != 0x34 || paddedRight[2] != 0 || paddedRight[3] != 0 {
+		t.Fatalf("unexpected PadRightBytes output: %x", paddedRight)
+	}
+
+	// No padding needed case
+	if res := PadLeftBytes(input, 2); &res[0] != &input[0] {
+		t.Fatalf("expected original slice reference when length >= target")
+	}
+}
+
+func BenchmarkPadLeftBytes(b *testing.B) {
+	input := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = PadLeftBytes(input, 32)
+	}
+}
+
+func BenchmarkPadRightBytes(b *testing.B) {
+	input := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = PadRightBytes(input, 32)
+	}
+}
