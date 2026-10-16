@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/Twigpine/twig/internal/client"
 )
@@ -32,7 +33,7 @@ func VisibilitySet(pathGlob, repoInput string, readers []string, mode, nodeURL, 
 		"mode":      mode,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/visibility", owner, name), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/visibility", url.PathEscape(owner), url.PathEscape(name)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("setting visibility rule: %w", err)
 	}
@@ -59,7 +60,7 @@ func VisibilityRemove(pathGlob, repoInput, nodeURL, dirOverride string) error {
 		"path_glob": pathGlob,
 	})
 
-	resp, err := c.Delete(fmt.Sprintf("/api/v1/repos/%s/%s/visibility", owner, name), bodyBytes)
+	resp, err := c.Delete(fmt.Sprintf("/api/v1/repos/%s/%s/visibility", url.PathEscape(owner), url.PathEscape(name)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("removing visibility rule: %w", err)
 	}
@@ -82,7 +83,7 @@ func VisibilityList(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/visibility", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/visibility", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("listing visibility rules: %w", err)
 	}
