@@ -164,10 +164,15 @@ func parsePrivateKey(hexKey string) (*big.Int, error) {
 }
 
 // addressFromPubkey derives the Ethereum address from uncompressed x, y.
+// Optimized: Assembles 64-byte uncompressed public key directly into a stack array
+// to eliminate slice heap allocations from PadLeftBytes and append.
 func addressFromPubkey(x, y *big.Int) [20]byte {
-	xb := PadLeftBytes(x.Bytes(), 32)
-	yb := PadLeftBytes(y.Bytes(), 32)
-	h := Keccak256(append(xb, yb...))
+	var pub [64]byte
+	xb := x.Bytes()
+	yb := y.Bytes()
+	copy(pub[32-len(xb):32], xb)
+	copy(pub[64-len(yb):64], yb)
+	h := Keccak256(pub[:])
 	var addr [20]byte
 	copy(addr[:], h[12:])
 	return addr
