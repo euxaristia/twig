@@ -190,19 +190,25 @@ func DecodeBool(data []byte, offset int) bool {
 }
 
 // PadLeftBytes pads b with leading zeroes to target length l.
+// Single-allocation optimization: allocates target slice directly and copies b into trailing position,
+// avoiding intermediate throwaway slice allocations and reallocations caused by make+append.
 func PadLeftBytes(b []byte, l int) []byte {
 	if len(b) >= l {
 		return b
 	}
-	pad := make([]byte, l-len(b))
-	return append(pad, b...)
+	res := make([]byte, l)
+	copy(res[l-len(b):], b)
+	return res
 }
 
 // PadRightBytes pads b with trailing zeroes to target length l.
+// Single-allocation optimization: allocates target slice directly and copies b into leading position,
+// avoiding intermediate throwaway slice allocations and reallocations caused by make+append.
 func PadRightBytes(b []byte, l int) []byte {
 	if len(b) >= l {
 		return b
 	}
-	pad := make([]byte, l-len(b))
-	return append(b, pad...)
+	res := make([]byte, l)
+	copy(res, b)
+	return res
 }

@@ -104,3 +104,43 @@ func TestABIDecodeMalformedData(t *testing.T) {
 		t.Errorf("expected error for out-of-bounds string length in DecodeString")
 	}
 }
+
+func TestPadBytes(t *testing.T) {
+	input := []byte{1, 2, 3}
+
+	left := PadLeftBytes(input, 5)
+	if len(left) != 5 || left[0] != 0 || left[1] != 0 || left[2] != 1 || left[3] != 2 || left[4] != 3 {
+		t.Errorf("PadLeftBytes failed: %v", left)
+	}
+
+	leftNoPad := PadLeftBytes(input, 3)
+	if len(leftNoPad) != 3 || leftNoPad[0] != 1 {
+		t.Errorf("PadLeftBytes no-pad failed: %v", leftNoPad)
+	}
+
+	right := PadRightBytes(input, 5)
+	if len(right) != 5 || right[0] != 1 || right[1] != 2 || right[2] != 3 || right[3] != 0 || right[4] != 0 {
+		t.Errorf("PadRightBytes failed: %v", right)
+	}
+
+	rightNoPad := PadRightBytes(input, 3)
+	if len(rightNoPad) != 3 || rightNoPad[0] != 1 {
+		t.Errorf("PadRightBytes no-pad failed: %v", rightNoPad)
+	}
+}
+
+func BenchmarkPadLeftBytes(b *testing.B) {
+	data := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = PadLeftBytes(data, 32)
+	}
+}
+
+func BenchmarkPadRightBytes(b *testing.B) {
+	data := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = PadRightBytes(data, 32)
+	}
+}
