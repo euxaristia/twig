@@ -68,6 +68,9 @@ func (s *Server) Serve(in io.Reader, out io.Writer) error {
 	}
 }
 
+// MaxContentLength is the maximum allowed byte length for incoming MCP Content-Length messages (16 MB).
+const MaxContentLength = 16 * 1024 * 1024
+
 // ReadMessage parses an LSP-style Content-Length framed JSON message.
 func ReadMessage(reader *bufio.Reader) ([]byte, error) {
 	contentLength := -1
@@ -91,6 +94,10 @@ func ReadMessage(reader *bufio.Reader) ([]byte, error) {
 
 	if contentLength < 0 {
 		return nil, errors.New("missing Content-Length header")
+	}
+
+	if contentLength > MaxContentLength {
+		return nil, fmt.Errorf("content length %d exceeds maximum limit of %d bytes", contentLength, MaxContentLength)
 	}
 
 	buf := make([]byte, contentLength)
