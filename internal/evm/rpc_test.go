@@ -171,3 +171,32 @@ func BenchmarkEncodeStringParameter(b *testing.B) {
 		_ = EncodeStringParameter(s)
 	}
 }
+
+func BenchmarkDecodeString(b *testing.B) {
+	s := EncodeStringParameter("alice.twig")
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = DecodeString(s, 0)
+	}
+}
+
+func BenchmarkDecodeAddress(b *testing.B) {
+	data := make([]byte, 64)
+	copy(data[44:64], []byte("01234567890123456789"))
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = DecodeAddress(data, 32)
+	}
+}
+
+func BenchmarkDecodeBool(b *testing.B) {
+	data := make([]byte, 32)
+	data[31] = 1
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = DecodeBool(data, 0)
+	}
+}
