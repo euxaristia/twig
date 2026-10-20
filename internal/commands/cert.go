@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/did"
@@ -25,7 +26,7 @@ func CertList(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/certs", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/certs", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("listing certs: %w", err)
 	}
@@ -96,7 +97,7 @@ func CertShow(repoInput, certID, nodeURL, dirOverride string, verify bool, expec
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/certs/%s", owner, name, certID))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/certs/%s", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(certID)))
 	if err != nil {
 		return fmt.Errorf("fetching cert: %w", err)
 	}

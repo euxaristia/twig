@@ -23,7 +23,7 @@ func ProtectSet(branch, repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	path := fmt.Sprintf("/api/v1/repos/%s/%s/branches/%s/protect", owner, name, url.PathEscape(branch))
+	path := fmt.Sprintf("/api/v1/repos/%s/%s/branches/%s/protect", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(branch))
 	resp, err := c.Post(path, []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("protecting branch: %w", err)
@@ -47,7 +47,7 @@ func ProtectRemove(branch, repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	path := fmt.Sprintf("/api/v1/repos/%s/%s/branches/%s/protect", owner, name, url.PathEscape(branch))
+	path := fmt.Sprintf("/api/v1/repos/%s/%s/branches/%s/protect", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(branch))
 	resp, err := c.Delete(path, []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("removing branch protection: %w", err)
@@ -67,7 +67,7 @@ func ProtectList(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	path := fmt.Sprintf("/api/v1/repos/%s/%s/branches/protected", owner, name)
+	path := fmt.Sprintf("/api/v1/repos/%s/%s/branches/protected", url.PathEscape(owner), url.PathEscape(name))
 	resp, err := c.GetAuthed(path)
 	if err != nil {
 		return fmt.Errorf("listing protected branches: %w", err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/Twigpine/twig/internal/client"
@@ -30,7 +31,7 @@ func Whoami(nodeURL, dirOverride string, outputJSON bool) error {
 		nodeURL = client.ResolveNodeURL(nodeURL)
 		c := client.New(nodeURL, kp)
 
-		resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", d))
+		resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", url.PathEscape(d)))
 		if err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
@@ -51,7 +52,7 @@ func Whoami(nodeURL, dirOverride string, outputJSON bool) error {
 				}
 
 				// Check repo count
-				if reposResp, err := c.Get(fmt.Sprintf("/api/v1/repos?owner=%s", short)); err == nil {
+				if reposResp, err := c.Get(fmt.Sprintf("/api/v1/repos?owner=%s", url.QueryEscape(short))); err == nil {
 					defer reposResp.Body.Close()
 					if reposResp.StatusCode == http.StatusOK {
 						var repos []interface{}

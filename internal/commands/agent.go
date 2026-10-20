@@ -30,7 +30,7 @@ func AgentShow(targetDID, nodeURL string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, nil)
 
-	resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", targetDID))
+	resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", url.PathEscape(targetDID)))
 	if err != nil {
 		return fmt.Errorf("fetching agent: %w", err)
 	}
