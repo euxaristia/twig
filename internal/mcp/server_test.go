@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -108,5 +109,18 @@ func TestToolCallEscaping(t *testing.T) {
 	expectedURI := "/api/v1/repos/user%2Fsub/my%2Frepo/tree?path=src%2Ffile.txt%3Fa%3Db%26c%3Dd"
 	if requestedURI != expectedURI {
 		t.Errorf("expected requested URI %q, got %q", expectedURI, requestedURI)
+	}
+}
+
+func TestReadMessageExceedsMaxContentLength(t *testing.T) {
+	rawHeader := "Content-Length: 20000000\r\n\r\n"
+	reader := bufio.NewReader(strings.NewReader(rawHeader))
+
+	_, err := ReadMessage(reader)
+	if err == nil {
+		t.Fatal("expected error for exceeding MaxContentLength, got nil")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum limit") {
+		t.Fatalf("unexpected error message: %v", err)
 	}
 }
