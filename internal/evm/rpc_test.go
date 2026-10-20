@@ -140,3 +140,34 @@ func BenchmarkPadRightBytes(b *testing.B) {
 		_ = PadRightBytes(input, 32)
 	}
 }
+
+func TestABIStringParamsEncodeDecode(t *testing.T) {
+	s1 := "alice.twig"
+	s2 := "did:key:z6MksDvRhDBYj9CdqhZMeRF95axLdFsX5q81RzfJsgRLHNmT"
+	encoded := EncodeStringParams(s1, s2)
+
+	dec1, err := DecodeString(encoded, 0)
+	if err != nil {
+		t.Fatalf("failed to decode str1: %v", err)
+	}
+	if dec1 != s1 {
+		t.Fatalf("str1 = %s, want %s", dec1, s1)
+	}
+
+	dec2, err := DecodeString(encoded, 32)
+	if err != nil {
+		t.Fatalf("failed to decode str2: %v", err)
+	}
+	if dec2 != s2 {
+		t.Fatalf("str2 = %s, want %s", dec2, s2)
+	}
+}
+
+func BenchmarkEncodeStringParameter(b *testing.B) {
+	s := "alice.twig"
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = EncodeStringParameter(s)
+	}
+}
