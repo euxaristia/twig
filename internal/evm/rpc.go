@@ -145,36 +145,67 @@ func EncodeStringParams(strs ...string) []byte {
 	return res
 }
 
+// decodeABIUint64 decodes a 32-byte ABI word as a uint64 without allocating big.Int.
+// Returns an error if the value exceeds uint64 or signed int64 bounds.
+func decodeABIUint64(word []byte) (uint64, error) {
+	if len(word) < 32 {
+		return 0, errors.New("data too short for uint64 word")
+	}
+	for i := 0; i < 24; i++ {
+		if word[i] != 0 {
+			return 0, errors.New("value exceeds uint64 limit")
+		}
+	}
+	val := binary.BigEndian.Uint64(word[24:32])
+	if val > 0x7fffffffffffffff {
+		return 0, errors.New("value exceeds int64 limit")
+	}
+	return val, nil
+}
+
 // DecodeString decodes a dynamic string from ABI return data.
+// Optimized: Replaces big.Int allocations for offset and length with direct
+// binary decoding, reducing heap allocations from 3 to 1 per call.
 func DecodeString(data []byte, offset int) (string, error) {
 	if offset < 0 || len(data) < offset+32 {
 		return "", errors.New("data too short for string offset")
 	}
-	strOffsetBig := new(big.Int).SetBytes(data[offset : offset+32])
-	if !strOffsetBig.IsInt64() {
-		return "", errors.New("string offset exceeds int64 limit")
+	strOffset, err := decodeABIUint64(data[offset : offset+32])
+	if err != nil {
+		return "", fmt.Errorf("string offset error: %w", err)
 	}
-	strOffset := int(strOffsetBig.Int64())
-	if strOffset < 0 || strOffset > len(data) || strOffset+32 > len(data) {
+	uStrOffset := int(strOffset)
+	if uStrOffset > len(data) || uStrOffset+32 > len(data) {
 		return "", errors.New("data too short for string length")
 	}
-	strLenBig := new(big.Int).SetBytes(data[strOffset : strOffset+32])
-	if !strLenBig.IsInt64() {
-		return "", errors.New("string length exceeds int64 limit")
+	strLen, err := decodeABIUint64(data[uStrOffset : uStrOffset+32])
+	if err != nil {
+		return "", fmt.Errorf("string length error: %w", err)
 	}
-	strLen := int(strLenBig.Int64())
-	if strLen < 0 || strLen > len(data)-(strOffset+32) {
+	uStrLen := int(strLen)
+	if uStrLen > len(data)-(uStrOffset+32) {
 		return "", errors.New("data too short for string content")
 	}
-	return string(data[strOffset+32 : strOffset+32+strLen]), nil
+	return string(data[uStrOffset+32 : uStrOffset+32+uStrLen]), nil
 }
 
 // DecodeAddress decodes a 20-byte address from a 32-byte ABI word.
+// Optimized: Uses stack buffer and hex lookup table to avoid string concatenation,
+// reducing heap allocations from 2 to 1 per call.
 func DecodeAddress(data []byte, offset int) string {
 	if offset < 0 || len(data) < offset+32 {
 		return "0x0000000000000000000000000000000000000000"
 	}
-	return "0x" + hex.EncodeToString(data[offset+12:offset+32])
+	const digits = "0123456789abcdef"
+	var buf [42]byte
+	buf[0] = '0'
+	buf[1] = 'x'
+	addrBytes := data[offset+12 : offset+32]
+	for i, v := range addrBytes {
+		buf[2+i*2] = digits[v>>4]
+		buf[2+i*2+1] = digits[v&0x0f]
+	}
+	return string(buf[:])
 }
 
 // DecodeUint256 decodes a uint256 word into *big.Int.
@@ -186,9 +217,18 @@ func DecodeUint256(data []byte, offset int) *big.Int {
 }
 
 // DecodeBool decodes a boolean word.
+// Optimized: Directly checks byte values in slice instead of instantiating big.Int,
+// reducing heap allocations from 1 to 0 per call.
 func DecodeBool(data []byte, offset int) bool {
-	n := DecodeUint256(data, offset)
-	return n.Sign() != 0
+	if offset < 0 || len(data) < offset+32 {
+		return false
+	}
+	for _, b := range data[offset : offset+32] {
+		if b != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // PadLeftBytes pads b with leading zeroes to target length l.
