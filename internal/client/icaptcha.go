@@ -158,19 +158,43 @@ func solveICaptchaPow(p *icaptchaPow) (string, error) {
 		return "0", nil
 	}
 
-	// Optimized: Construct buffer once and use strconv.AppendUint to append hex
-	// iteration nonces directly onto the slice without heap allocations per iteration.
+	// Optimized: Construct buffer once and increment hex nonces in-place.
+	// This eliminates strconv.AppendUint division and slice formatting overhead
+	// during PoW solving iterations.
 	buf := make([]byte, len(p.Challenge)+1, len(p.Challenge)+1+16)
 	copy(buf, p.Challenge)
 	buf[len(p.Challenge)] = ':'
+	buf = append(buf, '0')
 
-	prefixLen := len(buf)
+	prefixLen := len(p.Challenge) + 1
 
 	for i := 0; i < icaptchaPowMaxIters; i++ {
-		buf = strconv.AppendUint(buf[:prefixLen], uint64(i), 16)
 		hash := sha256.Sum256(buf)
 		if countLeadingZeroBits(hash[:]) >= p.Difficulty {
 			return string(buf[prefixLen:]), nil
+		}
+
+		// Fast in-place hex nonce increment
+		for j := len(buf) - 1; ; j-- {
+			if j < prefixLen {
+				// Carry reached beyond highest digit (e.g. "f" -> "10", "ff" -> "100")
+				buf = append(buf, '0')
+				buf[prefixLen] = '1'
+				break
+			}
+			c := buf[j]
+			if c < '9' {
+				buf[j] = c + 1
+				break
+			} else if c == '9' {
+				buf[j] = 'a'
+				break
+			} else if c < 'f' {
+				buf[j] = c + 1
+				break
+			}
+			// c == 'f'
+			buf[j] = '0'
 		}
 	}
 	return "", fmt.Errorf("iCaptcha PoW not solved within iteration cap (difficulty %d)", p.Difficulty)
