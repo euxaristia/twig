@@ -95,3 +95,13 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+func BenchmarkAddressFromPubkey(b *testing.B) {
+	c := secp256k1()
+	px, py := c.ScalarBaseMult([]byte{1, 2, 3, 4})
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = addressFromPubkey(px, py)
+	}
+}
