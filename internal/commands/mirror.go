@@ -18,6 +18,9 @@ func Mirror(source, repoNameOverride, description, nodeURL, dirOverride string) 
 	if strings.HasPrefix(source, "-") {
 		return fmt.Errorf("invalid repository source %q: source cannot start with '-'", source)
 	}
+	if strings.HasPrefix(repoNameOverride, "-") {
+		return fmt.Errorf("invalid repository name %q: name cannot start with '-'", repoNameOverride)
+	}
 
 	kp, err := EnsureIdentityExists(dirOverride)
 	if err != nil {
@@ -56,7 +59,7 @@ func Mirror(source, repoNameOverride, description, nodeURL, dirOverride string) 
 
 	remoteURL := client.FormatGitURL(owner, repoName)
 	fmt.Printf("Pushing mirror to %s...\n", remoteURL)
-	pushCmd := exec.Command("git", "push", "--mirror", remoteURL)
+	pushCmd := exec.Command("git", "push", "--mirror", "--", remoteURL)
 	pushCmd.Dir = tempDir
 	pushCmd.Stdout = os.Stdout
 	pushCmd.Stderr = os.Stderr
