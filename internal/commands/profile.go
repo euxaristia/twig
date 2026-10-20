@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/Twigpine/twig/internal/client"
 )
@@ -47,7 +48,7 @@ func ProfileSet(name, bio, avatar, website, twitter, github, farcaster, telegram
 	}
 
 	bodyBytes, _ := json.Marshal(body)
-	resp, err := c.Put(fmt.Sprintf("/api/v1/agents/%s/profile", kp.DID()), bodyBytes)
+	resp, err := c.Put(fmt.Sprintf("/api/v1/agents/%s/profile", url.PathEscape(kp.DID())), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("updating profile: %w", err)
 	}
@@ -68,7 +69,7 @@ func ProfileShow(targetDID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, nil)
 
-	resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s/profile", targetDID))
+	resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s/profile", url.PathEscape(targetDID)))
 	if err != nil {
 		return fmt.Errorf("fetching profile: %w", err)
 	}
@@ -86,7 +87,7 @@ func ProfileClear(nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Delete(fmt.Sprintf("/api/v1/agents/%s/profile", kp.DID()), []byte("{}"))
+	resp, err := c.Delete(fmt.Sprintf("/api/v1/agents/%s/profile", url.PathEscape(kp.DID())), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("clearing profile: %w", err)
 	}
@@ -104,7 +105,7 @@ func ProfilePin(nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/agents/%s/profile/pin", kp.DID()), []byte("{}"))
+	resp, err := c.Post(fmt.Sprintf("/api/v1/agents/%s/profile/pin", url.PathEscape(kp.DID())), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("pinning profile: %w", err)
 	}

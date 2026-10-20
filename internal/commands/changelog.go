@@ -3,6 +3,7 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/identity"
@@ -33,7 +34,7 @@ func Changelog(repoInput string, limit int, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	endpoint := fmt.Sprintf("/api/v1/repos/%s/%s/changelog?limit=%d", owner, name, limit)
+	endpoint := fmt.Sprintf("/api/v1/repos/%s/%s/changelog?limit=%d", url.PathEscape(owner), url.PathEscape(name), limit)
 	resp, err := c.GetAuthed(endpoint)
 	if err != nil {
 		return fmt.Errorf("fetching changelog: %w", err)

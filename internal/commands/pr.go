@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 
 	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/identity"
@@ -38,7 +39,7 @@ func PrCreate(repoInput, head, base, title, body, ownerOverride, nodeURL, dirOve
 		"body":          body,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", owner, name), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", url.PathEscape(owner), url.PathEscape(name)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("creating PR: %w", err)
 	}
@@ -57,7 +58,7 @@ func PrList(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("listing PRs: %w", err)
 	}
@@ -76,7 +77,7 @@ func PrView(repoInput string, number int, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d", owner, name, number))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d", url.PathEscape(owner), url.PathEscape(name), number))
 	if err != nil {
 		return fmt.Errorf("fetching PR: %w", err)
 	}
@@ -95,7 +96,7 @@ func PrDiff(repoInput string, number int, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/diff", owner, name, number))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/diff", url.PathEscape(owner), url.PathEscape(name), number))
 	if err != nil {
 		return fmt.Errorf("fetching PR diff: %w", err)
 	}
@@ -124,7 +125,7 @@ func PrMerge(repoInput string, number int, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/merge", owner, name, number), []byte("{}"))
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/merge", url.PathEscape(owner), url.PathEscape(name), number), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("merging PR: %w", err)
 	}
@@ -156,7 +157,7 @@ func PrReview(repoInput string, number int, status, body, nodeURL, dirOverride s
 		"body":   body,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/reviews", owner, name, number), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/reviews", url.PathEscape(owner), url.PathEscape(name), number), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("submitting review: %w", err)
 	}
@@ -183,7 +184,7 @@ func PrComment(repoInput string, number int, body, nodeURL, dirOverride string) 
 		"body": body,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/comments", owner, name, number), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/comments", url.PathEscape(owner), url.PathEscape(name), number), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("commenting on PR: %w", err)
 	}
@@ -202,7 +203,7 @@ func PrComments(repoInput string, number int, nodeURL, dirOverride string) error
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/comments", owner, name, number))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls/%d/comments", url.PathEscape(owner), url.PathEscape(name), number))
 	if err != nil {
 		return fmt.Errorf("fetching PR comments: %w", err)
 	}

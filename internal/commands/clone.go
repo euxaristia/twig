@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -111,7 +112,7 @@ func Clone(repoInput, destDir, branch, nodeURL, arweaveGateway, ipfsGateway stri
 }
 
 func fetchWithheldPaths(c *client.NodeClient, owner, name string) ([]string, []string, error) {
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/withheld-paths", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/withheld-paths", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return nil, nil, err
 	}

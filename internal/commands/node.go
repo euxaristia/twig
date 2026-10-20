@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/url"
 
 	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/did"
@@ -54,7 +55,7 @@ func NodeStatus(nodeURL, dirOverride string) error {
 		short := did.ShortDID(callerDID)
 		fmt.Println("\n── Local Identity Context ────────────────────────────────────────")
 		fmt.Printf("  Identity:   %s\n", callerDID)
-		if agentResp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", callerDID)); err == nil {
+		if agentResp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", url.PathEscape(callerDID))); err == nil {
 			defer agentResp.Body.Close()
 			if agentResp.StatusCode == http.StatusOK {
 				var aInfo map[string]interface{}
@@ -78,7 +79,7 @@ func NodeTrust(targetDID, nodeURL string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, nil)
 
-	resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", targetDID))
+	resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", url.PathEscape(targetDID)))
 	if err != nil {
 		return fmt.Errorf("fetching agent trust: %w", err)
 	}
@@ -105,7 +106,7 @@ func NodeResolve(targetDID, nodeURL string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, nil)
 
-	resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", targetDID))
+	resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", url.PathEscape(targetDID)))
 	if err != nil {
 		return fmt.Errorf("resolving agent: %w", err)
 	}

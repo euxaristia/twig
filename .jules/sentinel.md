@@ -1,3 +1,8 @@
+## 2025-05-21 - Escape Dynamic URL Path Parameters in CLI API Requests
+**Vulnerability:** Dynamic path parameters (`owner`, `name`, `issueID`, `certID`, `bountyID`, `taskID`, `targetDID`, `cid`) formatted directly into HTTP endpoint URLs in CLI commands enabled path traversal (`../`) and API route injection against remote node endpoints.
+**Learning:** Even if the MCP server implementation applies URL path escaping, CLI command endpoints constructing raw Sprintf URL paths must also consistently apply `url.PathEscape` and `url.QueryEscape`.
+**Prevention:** Always wrap dynamic URL path segments in `url.PathEscape` and query parameters in `url.QueryEscape` when building HTTP request paths.
+
 ## 2025-05-20 - Enforce Not-Before (`nbf`) Claim in UCAN Token Verification
 **Vulnerability:** UCAN token verification in CLI and MCP handlers computed token validity as `sigErr == nil && !isExpired`, ignoring the `nbf` (not before) claim. Future-dated UCAN tokens were treated as currently valid authorization tokens.
 **Learning:** Defining helper methods like `IsBeforeValid()` without wiring them into top-level `IsValid()` or handler validation logic creates a gap where time-bound security claims are silently ignored.

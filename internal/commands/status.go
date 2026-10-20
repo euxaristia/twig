@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/Twigpine/twig/internal/client"
@@ -66,7 +67,7 @@ func Status(nodeURL, dirOverride string) error {
 		fmt.Printf("  identity  %s\n", short)
 
 		// Trust
-		if resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", did.ShortDID(d))); err == nil {
+		if resp, err := c.Get(fmt.Sprintf("/api/v1/agents/%s", url.PathEscape(did.ShortDID(d)))); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				var info map[string]interface{}
@@ -86,7 +87,7 @@ func Status(nodeURL, dirOverride string) error {
 		fmt.Printf("  repo      %s/%s\n", owner, repo)
 
 		// Open PRs
-		if resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", owner, repo)); err == nil {
+		if resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", url.PathEscape(owner), url.PathEscape(repo))); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				var prs []interface{}
@@ -97,7 +98,7 @@ func Status(nodeURL, dirOverride string) error {
 		}
 
 		// Open issues
-		if resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/issues", owner, repo)); err == nil {
+		if resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/issues", url.PathEscape(owner), url.PathEscape(repo))); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				var issues []interface{}

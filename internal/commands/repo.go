@@ -84,7 +84,7 @@ func RepoInfo(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("fetching repo info: %w", err)
 	}
@@ -110,7 +110,7 @@ func RepoCommits(repoInput, branch string, limit int, nodeURL, dirOverride strin
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	endpoint := fmt.Sprintf("/api/v1/repos/%s/%s/commits?branch=%s&limit=%d", owner, name, url.QueryEscape(branch), limit)
+	endpoint := fmt.Sprintf("/api/v1/repos/%s/%s/commits?branch=%s&limit=%d", url.PathEscape(owner), url.PathEscape(name), url.QueryEscape(branch), limit)
 	resp, err := c.GetAuthed(endpoint)
 	if err != nil {
 		return fmt.Errorf("fetching commits: %w", err)
@@ -138,7 +138,7 @@ func RepoFork(repoInput, forkName, nodeURL, dirOverride string) error {
 		"name": forkName,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/fork", owner, name), body)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/fork", url.PathEscape(owner), url.PathEscape(name)), body)
 	if err != nil {
 		return fmt.Errorf("forking repo: %w", err)
 	}
@@ -165,7 +165,7 @@ func RepoLabelAdd(repoInput, label, nodeURL, dirOverride string) error {
 		"label": label,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/labels", owner, name), body)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/labels", url.PathEscape(owner), url.PathEscape(name)), body)
 	if err != nil {
 		return fmt.Errorf("adding label: %w", err)
 	}
@@ -188,7 +188,7 @@ func RepoLabelRemove(repoInput, label, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Delete(fmt.Sprintf("/api/v1/repos/%s/%s/labels/%s", owner, name, url.PathEscape(label)), []byte("{}"))
+	resp, err := c.Delete(fmt.Sprintf("/api/v1/repos/%s/%s/labels/%s", url.PathEscape(owner), url.PathEscape(name), url.PathEscape(label)), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("removing label: %w", err)
 	}
@@ -207,7 +207,7 @@ func RepoLabelList(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/labels", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/labels", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("fetching labels: %w", err)
 	}
@@ -226,7 +226,7 @@ func RepoOwner(repoInput, nodeURL, dirOverride string, outputJSON bool) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("fetching repo: %w", err)
 	}
@@ -296,7 +296,7 @@ func RepoReplicaRegister(repoInput, replicaURL, nodeURL, dirOverride string) err
 		"url": replicaURL,
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/replicas", owner, name), body)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/repos/%s/%s/replicas", url.PathEscape(owner), url.PathEscape(name)), body)
 	if err != nil {
 		return fmt.Errorf("registering replica: %w", err)
 	}
@@ -319,7 +319,7 @@ func RepoReplicaUnregister(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Delete(fmt.Sprintf("/api/v1/repos/%s/%s/replicas", owner, name), []byte("{}"))
+	resp, err := c.Delete(fmt.Sprintf("/api/v1/repos/%s/%s/replicas", url.PathEscape(owner), url.PathEscape(name)), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("unregistering replica: %w", err)
 	}
@@ -338,7 +338,7 @@ func RepoReplicas(repoInput, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/replicas", owner, name))
+	resp, err := c.GetAuthed(fmt.Sprintf("/api/v1/repos/%s/%s/replicas", url.PathEscape(owner), url.PathEscape(name)))
 	if err != nil {
 		return fmt.Errorf("listing replicas: %w", err)
 	}

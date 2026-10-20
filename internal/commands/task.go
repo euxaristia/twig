@@ -90,7 +90,7 @@ func TaskView(taskID, nodeURL string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, nil)
 
-	resp, err := c.Get(fmt.Sprintf("/api/v1/tasks/%s", taskID))
+	resp, err := c.Get(fmt.Sprintf("/api/v1/tasks/%s", url.PathEscape(taskID)))
 	if err != nil {
 		return fmt.Errorf("fetching task: %w", err)
 	}
@@ -108,7 +108,7 @@ func TaskClaim(taskID, nodeURL, dirOverride string) error {
 	nodeURL = client.ResolveNodeURL(nodeURL)
 	c := client.New(nodeURL, kp)
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/tasks/%s/claim", taskID), []byte("{}"))
+	resp, err := c.Post(fmt.Sprintf("/api/v1/tasks/%s/claim", url.PathEscape(taskID)), []byte("{}"))
 	if err != nil {
 		return fmt.Errorf("claiming task: %w", err)
 	}
@@ -131,7 +131,7 @@ func TaskComplete(taskID, result, nodeURL, dirOverride string) error {
 		"by_did": kp.DID(),
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/tasks/%s/complete", taskID), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/tasks/%s/complete", url.PathEscape(taskID)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("completing task: %w", err)
 	}
@@ -154,7 +154,7 @@ func TaskFail(taskID, reason, nodeURL, dirOverride string) error {
 		"by_did": kp.DID(),
 	})
 
-	resp, err := c.Post(fmt.Sprintf("/api/v1/tasks/%s/fail", taskID), bodyBytes)
+	resp, err := c.Post(fmt.Sprintf("/api/v1/tasks/%s/fail", url.PathEscape(taskID)), bodyBytes)
 	if err != nil {
 		return fmt.Errorf("failing task: %w", err)
 	}
