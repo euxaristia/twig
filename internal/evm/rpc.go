@@ -2,6 +2,7 @@ package evm
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -105,41 +106,42 @@ func EncodeFunctionSignature(sig string) []byte {
 }
 
 // EncodeStringParameter encodes a dynamic string argument per ABI specs.
+// Optimized to single buffer allocation and binary big-endian encoding.
 func EncodeStringParameter(s string) []byte {
-	// Offset: 32 bytes (points to 0x20)
-	offset := PadLeftBytes(big.NewInt(32).Bytes(), 32)
 	strBytes := []byte(s)
-	length := PadLeftBytes(big.NewInt(int64(len(strBytes))).Bytes(), 32)
-	paddedData := PadRightBytes(strBytes, ((len(strBytes)+31)/32)*32)
-
-	var res []byte
-	res = append(res, offset...)
-	res = append(res, length...)
-	res = append(res, paddedData...)
+	dataLen := ((len(strBytes) + 31) / 32) * 32
+	res := make([]byte, 32+32+dataLen)
+	res[31] = 0x20 // Offset: 32 bytes (points to 0x20)
+	binary.BigEndian.PutUint64(res[56:64], uint64(len(strBytes)))
+	copy(res[64:], strBytes)
 	return res
 }
 
 // EncodeStringParams encodes multiple dynamic string arguments per ABI specs.
+// Optimized to compute total required buffer size upfront and allocate a single byte slice,
+// avoiding big.Int allocations, repeated re-allocations, and intermediate slice copies.
 func EncodeStringParams(strs ...string) []byte {
 	headSize := 32 * len(strs)
-	var head, tail []byte
-	offset := headSize
+	totalLen := headSize
 	for _, s := range strs {
-		head = append(head, PadLeftBytes(big.NewInt(int64(offset)).Bytes(), 32)...)
-		enc := encodeStringData(s)
-		tail = append(tail, enc...)
-		offset += len(enc)
+		totalLen += 32 + ((len(s)+31)/32)*32
 	}
-	return append(head, tail...)
-}
 
-func encodeStringData(s string) []byte {
-	strBytes := []byte(s)
-	length := PadLeftBytes(big.NewInt(int64(len(strBytes))).Bytes(), 32)
-	paddedData := PadRightBytes(strBytes, ((len(strBytes)+31)/32)*32)
-	var res []byte
-	res = append(res, length...)
-	res = append(res, paddedData...)
+	res := make([]byte, totalLen)
+	headOffset := 0
+	tailOffset := headSize
+
+	for _, s := range strs {
+		// Write head entry (offset to string data in tail)
+		binary.BigEndian.PutUint64(res[headOffset+24:headOffset+32], uint64(tailOffset))
+		headOffset += 32
+
+		// Write tail entry (string length + padded string bytes)
+		strLen := len(s)
+		binary.BigEndian.PutUint64(res[tailOffset+24:tailOffset+32], uint64(strLen))
+		copy(res[tailOffset+32:], s)
+		tailOffset += 32 + ((strLen+31)/32)*32
+	}
 	return res
 }
 
