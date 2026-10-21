@@ -128,7 +128,8 @@ func keccakF1600(a *[25]uint64) {
 }
 
 // Keccak256 computes the Ethereum Keccak-256 hash of data (padding 0x01).
-func Keccak256(data []byte) []byte {
+// Optimized: Returns a fixed [32]byte array directly on the stack to prevent heap allocations.
+func Keccak256(data []byte) [32]byte {
 	rate := 136 // 1088 bits = 136 bytes for Keccak-256
 	var state [25]uint64
 
@@ -154,8 +155,8 @@ func Keccak256(data []byte) []byte {
 	}
 	keccakF1600(&state)
 
-	// Squeeze 32 bytes
-	out := make([]byte, 32)
+	// Squeeze 32 bytes directly into stack array
+	var out [32]byte
 	for i := 0; i < 4; i++ {
 		binary.LittleEndian.PutUint64(out[i*8:(i+1)*8], state[i])
 	}

@@ -139,7 +139,7 @@ func TestNodeHeartbeatSubmitsTx(t *testing.T) {
 	}
 	kpDID := stakeTestIdentityDID(t, idDir)
 	wantHash := evm.Keccak256([]byte(kpDID))
-	if hex.EncodeToString(data[4:36]) != hex.EncodeToString(wantHash) {
+	if hex.EncodeToString(data[4:36]) != hex.EncodeToString(wantHash[:]) {
 		t.Fatalf("did hash mismatch")
 	}
 }

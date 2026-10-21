@@ -285,7 +285,7 @@ func SendTransaction(rpcURL, privateKeyHex, to string, data []byte) (*TxReceipt,
 		rlpEncodeList(nil), // access list
 	}
 	sigHash := Keccak256(append([]byte{0x02}, rlpEncodeList(unsigned)...))
-	r, s, yParity, err := secpSign(d, sigHash)
+	r, s, yParity, err := secpSign(d, sigHash[:])
 	if err != nil {
 		return nil, fmt.Errorf("signing transaction: %w", err)
 	}
