@@ -2,6 +2,10 @@
 **Vulnerability:** `ucan.Decode()` executed `os.Stat()` on raw token input before checking if it was JSON text, allowing raw JSON token strings to trigger filesystem syscalls. Additionally, unmarshaling tokens with omitted/null `prf` or `att` fields caused `VerifySignature()` to serialize them as `null` rather than `[]`, invalidating legitimate signatures.
 **Learning:** Functions accepting both inline JSON and file paths must check for leading JSON indicators (`{` or `[`) before attempting file system lookups. Cryptographic signature verification over structs must normalize `nil` slice fields to empty non-nil slices before re-marshaling JSON.
 **Prevention:** Always check prefix for JSON structures before file operations, and ensure nil slice fields are normalized before signature verification.
+## 2025-05-22 - Prevent Integer Overflow Panics in EVM ABI Decoding
+**Vulnerability:** Bounds checks structured as `len(data) < offset+32` in EVM ABI decoding functions allowed integer overflow when untrusted RPC data provided large offset values (e.g. `0x7fffffffffffffff - 10`), resulting in slice out-of-bounds panics and Denial of Service.
+**Learning:** Checking `len(data) < offset + N` causes signed integer overflow when `offset` is large, evaluating to `true` on overflow and bypassing safety checks before slicing `data[offset:offset+32]`.
+**Prevention:** Always write bounds checks using subtraction (`offset < 0 || offset > len(data)-N`) instead of adding offset and width together.
 
 ## 2025-05-21 - Escape Dynamic URL Path Parameters in CLI API Requests
 **Vulnerability:** Dynamic path parameters (`owner`, `name`, `issueID`, `certID`, `bountyID`, `taskID`, `targetDID`, `cid`) formatted directly into HTTP endpoint URLs in CLI commands enabled path traversal (`../`) and API route injection against remote node endpoints.
