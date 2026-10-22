@@ -103,6 +103,21 @@ func TestABIDecodeMalformedData(t *testing.T) {
 	if _, err := DecodeString(validOffsetData, 0); err == nil {
 		t.Errorf("expected error for out-of-bounds string length in DecodeString")
 	}
+
+	// Large offset causing integer overflow when computing offset+32
+	largeOffset := 0x7fffffffffffffff - 10
+	if _, err := DecodeString(validOffsetData, largeOffset); err == nil {
+		t.Errorf("expected error for large offset integer overflow in DecodeString")
+	}
+	if addr := DecodeAddress(validOffsetData, largeOffset); addr != "0x0000000000000000000000000000000000000000" {
+		t.Errorf("expected default address for large offset integer overflow in DecodeAddress, got %s", addr)
+	}
+	if val := DecodeUint256(validOffsetData, largeOffset); val.Sign() != 0 {
+		t.Errorf("expected 0 for large offset integer overflow in DecodeUint256")
+	}
+	if b := DecodeBool(validOffsetData, largeOffset); b {
+		t.Errorf("expected false for large offset integer overflow in DecodeBool")
+	}
 }
 
 func TestPadLeftAndRightBytes(t *testing.T) {

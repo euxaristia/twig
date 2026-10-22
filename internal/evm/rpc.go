@@ -168,7 +168,7 @@ func decodeABIUint64(word []byte) (uint64, error) {
 // Optimized: Replaces big.Int allocations for offset and length with direct
 // binary decoding, reducing heap allocations from 3 to 1 per call.
 func DecodeString(data []byte, offset int) (string, error) {
-	if offset < 0 || len(data) < offset+32 {
+	if offset < 0 || offset > len(data)-32 {
 		return "", errors.New("data too short for string offset")
 	}
 	strOffset, err := decodeABIUint64(data[offset : offset+32])
@@ -176,7 +176,7 @@ func DecodeString(data []byte, offset int) (string, error) {
 		return "", fmt.Errorf("string offset error: %w", err)
 	}
 	uStrOffset := int(strOffset)
-	if uStrOffset > len(data) || uStrOffset+32 > len(data) {
+	if uStrOffset < 0 || uStrOffset > len(data)-32 {
 		return "", errors.New("data too short for string length")
 	}
 	strLen, err := decodeABIUint64(data[uStrOffset : uStrOffset+32])
@@ -184,7 +184,7 @@ func DecodeString(data []byte, offset int) (string, error) {
 		return "", fmt.Errorf("string length error: %w", err)
 	}
 	uStrLen := int(strLen)
-	if uStrLen > len(data)-(uStrOffset+32) {
+	if uStrLen < 0 || uStrLen > len(data)-(uStrOffset+32) {
 		return "", errors.New("data too short for string content")
 	}
 	return string(data[uStrOffset+32 : uStrOffset+32+uStrLen]), nil
@@ -194,7 +194,7 @@ func DecodeString(data []byte, offset int) (string, error) {
 // Optimized: Uses stack buffer and hex lookup table to avoid string concatenation,
 // reducing heap allocations from 2 to 1 per call.
 func DecodeAddress(data []byte, offset int) string {
-	if offset < 0 || len(data) < offset+32 {
+	if offset < 0 || offset > len(data)-32 {
 		return "0x0000000000000000000000000000000000000000"
 	}
 	const digits = "0123456789abcdef"
@@ -211,7 +211,7 @@ func DecodeAddress(data []byte, offset int) string {
 
 // DecodeUint256 decodes a uint256 word into *big.Int.
 func DecodeUint256(data []byte, offset int) *big.Int {
-	if offset < 0 || len(data) < offset+32 {
+	if offset < 0 || offset > len(data)-32 {
 		return big.NewInt(0)
 	}
 	return new(big.Int).SetBytes(data[offset : offset+32])
@@ -221,7 +221,7 @@ func DecodeUint256(data []byte, offset int) *big.Int {
 // Optimized: Directly checks byte values in slice instead of instantiating big.Int,
 // reducing heap allocations from 1 to 0 per call.
 func DecodeBool(data []byte, offset int) bool {
-	if offset < 0 || len(data) < offset+32 {
+	if offset < 0 || offset > len(data)-32 {
 		return false
 	}
 	for _, b := range data[offset : offset+32] {
