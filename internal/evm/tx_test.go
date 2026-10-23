@@ -166,11 +166,11 @@ func TestSendTransactionFullFlow(t *testing.T) {
 	curve := secp256k1()
 	px, py := curve.ScalarBaseMult(PadLeftBytes(d.Bytes(), 32))
 	pub := ecdsa.PublicKey{Curve: curve, X: px, Y: py}
-	if !ecdsa.Verify(&pub, sigHash, r, s) {
+	if !ecdsa.Verify(&pub, sigHash[:], r, s) {
 		t.Fatalf("transaction signature does not verify")
 	}
 	// y-parity must recover to the signer.
-	qx, qy, err := recoverPubkey(r, s, sigHash, byte(yParity))
+	qx, qy, err := recoverPubkey(r, s, sigHash[:], byte(yParity))
 	if err != nil {
 		t.Fatalf("recoverPubkey failed: %v", err)
 	}

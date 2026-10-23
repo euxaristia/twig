@@ -60,7 +60,7 @@ func TestSecpSignAndRecover(t *testing.T) {
 		t.Fatalf("parsePrivateKey failed: %v", err)
 	}
 	msgHash := Keccak256([]byte("hello twigpine"))
-	r, s, yParity, err := secpSign(d, msgHash)
+	r, s, yParity, err := secpSign(d, msgHash[:])
 	if err != nil {
 		t.Fatalf("secpSign failed: %v", err)
 	}
@@ -71,11 +71,11 @@ func TestSecpSignAndRecover(t *testing.T) {
 	curve := secp256k1()
 	px, py := curve.ScalarBaseMult(PadLeftBytes(d.Bytes(), 32))
 	pub := ecdsa.PublicKey{Curve: curve, X: px, Y: py}
-	if !ecdsa.Verify(&pub, msgHash, r, s) {
+	if !ecdsa.Verify(&pub, msgHash[:], r, s) {
 		t.Fatalf("ECDSA verification failed")
 	}
 	// Recovery must yield the signer.
-	qx, qy, err := recoverPubkey(r, s, msgHash, yParity)
+	qx, qy, err := recoverPubkey(r, s, msgHash[:], yParity)
 	if err != nil {
 		t.Fatalf("recoverPubkey failed: %v", err)
 	}

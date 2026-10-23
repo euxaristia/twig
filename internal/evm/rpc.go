@@ -102,7 +102,8 @@ func (c *Client) EthCall(toAddress, dataHex string) ([]byte, error) {
 
 // EncodeFunctionSignature returns the 4-byte selector.
 func EncodeFunctionSignature(sig string) []byte {
-	return Keccak256([]byte(sig))[:4]
+	h := Keccak256([]byte(sig))
+	return h[:4]
 }
 
 // EncodeStringParameter encodes a dynamic string argument per ABI specs.

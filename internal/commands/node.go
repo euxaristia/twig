@@ -130,7 +130,7 @@ func NodeOnchainStatus(nodeURL, rpcURL, contractAddr, dirOverride string) error 
 	didHash := evm.Keccak256([]byte(kp.DID()))
 
 	c := evm.NewClient(rpcURL)
-	data := append(evm.EncodeFunctionSignature("getNodeInfo(bytes32)"), mustBytes32(didHash)...)
+	data := append(evm.EncodeFunctionSignature("getNodeInfo(bytes32)"), didHash[:]...)
 	res, err := c.EthCall(contractAddr, "0x"+hex.EncodeToString(data))
 	if err != nil {
 		return fmt.Errorf("getNodeInfo failed: %w", err)
@@ -211,7 +211,7 @@ func stakingTx(privateKey, rpcURL, contractAddr, dirOverride string, data []byte
 	if err != nil {
 		return nil, didHash, err
 	}
-	copy(didHash[:], evm.Keccak256([]byte(kp.DID())))
+	didHash = evm.Keccak256([]byte(kp.DID()))
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
 	}
@@ -290,7 +290,7 @@ func NodeRegisterOnchain(stake uint64, httpURL, privateKey, rpcURL, contractAddr
 
 	// 3. Register the node.
 	fmt.Printf("Registering node (staking %d $GITLAWB)...\n", stake)
-	hb, _ := evm.EncodeBytes32Param(didHash)
+	hb, _ := evm.EncodeBytes32Param(didHash[:])
 	regData := append(evm.EncodeFunctionSignature("registerNode(bytes32,string,uint256)"), hb...)
 	regData = append(regData, evm.EncodeStringParams(httpURL)...)
 	regData = append(regData, evm.EncodeUint256Param(stakeWei)...)
@@ -321,8 +321,7 @@ func NodeHeartbeat(privateKey, rpcURL, contractAddr, dirOverride string) error {
 		return err
 	}
 	fmt.Printf("Posting heartbeat for %s...\n", kp.DID())
-	var didHash [32]byte
-	copy(didHash[:], evm.Keccak256([]byte(kp.DID())))
+	didHash := evm.Keccak256([]byte(kp.DID()))
 	receipt, _, err := stakingTx(privateKey, rpcURL, contractAddr, dirOverride,
 		stakingCallData("heartbeat(bytes32)", didHash))
 	if err != nil {
@@ -339,8 +338,7 @@ func NodeClaim(privateKey, rpcURL, contractAddr, dirOverride string) error {
 		return err
 	}
 	fmt.Printf("Claiming rewards for %s...\n", kp.DID())
-	var didHash [32]byte
-	copy(didHash[:], evm.Keccak256([]byte(kp.DID())))
+	didHash := evm.Keccak256([]byte(kp.DID()))
 	receipt, _, err := stakingTx(privateKey, rpcURL, contractAddr, dirOverride,
 		stakingCallData("claimRewards(bytes32)", didHash))
 	if err != nil {
@@ -357,8 +355,7 @@ func NodeUnstakeRequest(privateKey, rpcURL, contractAddr, dirOverride string) er
 		return err
 	}
 	fmt.Println("Requesting unstake (starts 7-day cooldown)...")
-	var didHash [32]byte
-	copy(didHash[:], evm.Keccak256([]byte(kp.DID())))
+	didHash := evm.Keccak256([]byte(kp.DID()))
 	receipt, _, err := stakingTx(privateKey, rpcURL, contractAddr, dirOverride,
 		stakingCallData("requestUnstake(bytes32)", didHash))
 	if err != nil {
@@ -376,8 +373,7 @@ func NodeUnstake(privateKey, rpcURL, contractAddr, dirOverride string) error {
 		return err
 	}
 	fmt.Println("Completing unstake...")
-	var didHash [32]byte
-	copy(didHash[:], evm.Keccak256([]byte(kp.DID())))
+	didHash := evm.Keccak256([]byte(kp.DID()))
 	receipt, _, err := stakingTx(privateKey, rpcURL, contractAddr, dirOverride,
 		stakingCallData("unstake(bytes32)", didHash))
 	if err != nil {
