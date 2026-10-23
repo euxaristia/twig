@@ -76,10 +76,10 @@ func Init(repoName, description, nodeURL, dirOverride string) error {
 	owner := did.ShortDID(kp.DID())
 	remoteURL := client.FormatGitURL(owner, repoName)
 	remoteName := client.GitURLScheme()
-	if out, err := exec.Command("git", "remote", "get-url", remoteName).Output(); err == nil && len(bytes.TrimSpace(out)) > 0 {
+	if out, err := exec.Command("git", "remote", "get-url", "--", remoteName).Output(); err == nil && len(bytes.TrimSpace(out)) > 0 {
 		fmt.Printf("  Remote '%s' already set.\n", remoteName)
 	} else {
-		if err := exec.Command("git", "remote", "add", remoteName, remoteURL).Run(); err != nil {
+		if err := exec.Command("git", "remote", "add", "--", remoteName, remoteURL).Run(); err != nil {
 			return fmt.Errorf("adding git remote: %w", err)
 		}
 		fmt.Printf("  Remote added: %s\n", remoteURL)

@@ -101,7 +101,7 @@ func TestInitPreservesOriginRemote(t *testing.T) {
 	}
 
 	remoteName := client.GitURLScheme()
-	gotURL := gitConfig(t, workdir, "remote", "get-url", remoteName)
+	gotURL := gitConfig(t, workdir, "remote", "get-url", "--", remoteName)
 	if !strings.HasPrefix(gotURL, client.GitURLScheme()+"://") || !strings.HasSuffix(gotURL, "/myrepo") {
 		t.Fatalf("unexpected %s remote URL: %q", remoteName, gotURL)
 	}
@@ -132,5 +132,33 @@ func TestInitFailsFastOnRegistrationError(t *testing.T) {
 	remotes := gitConfig(t, workdir, "remote")
 	if strings.Contains(remotes, "twigpine") || strings.Contains(remotes, "gitlawb") {
 		t.Fatalf("new remote added despite failed init: %q", remotes)
+	}
+}
+
+func TestGitRemoteOptionInjectionProtection(t *testing.T) {
+	workdir := testGitRepo(t, "https://example.com/repo.git")
+
+	// Try querying a remote name starting with '-' with double-dash '--'
+	cmdGet := exec.Command("git", "remote", "get-url", "--", "-dashremote")
+	cmdGet.Dir = workdir
+	outGet, errGet := cmdGet.CombinedOutput()
+	// Should fail because -dashremote doesn't exist, NOT because git rejected unknown flag/option
+	if errGet == nil {
+		t.Fatalf("expected get-url for non-existent remote to fail")
+	}
+	if strings.Contains(string(outGet), "unknown option") || strings.Contains(string(outGet), "error: unknown switch") {
+		t.Fatalf("git treated -dashremote as an option: %s", outGet)
+	}
+
+	// Try adding a remote name starting with '-' with double-dash '--'
+	cmdAdd := exec.Command("git", "remote", "add", "--", "-dashremote", "https://example.com/test.git")
+	cmdAdd.Dir = workdir
+	if out, err := cmdAdd.CombinedOutput(); err != nil {
+		t.Fatalf("git remote add with '--' failed: %v\n%s", err, out)
+	}
+
+	gotURL := gitConfig(t, workdir, "remote", "get-url", "--", "-dashremote")
+	if gotURL != "https://example.com/test.git" {
+		t.Fatalf("expected remote URL %q, got %q", "https://example.com/test.git", gotURL)
 	}
 }
