@@ -11,17 +11,20 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"math/big"
 )
 
 var (
-	secpP, _  = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
-	secpN, _  = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
-	secpB, _  = new(big.Int).SetString("0000000000000000000000000000000000000000000000000000000000000007", 16)
-	secpGx, _ = new(big.Int).SetString("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16)
-	secpGy, _ = new(big.Int).SetString("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16)
-	secpHalfN = new(big.Int).Rsh(secpN, 1)
+	secpP, _    = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
+	secpN, _    = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
+	secpB, _    = new(big.Int).SetString("0000000000000000000000000000000000000000000000000000000000000007", 16)
+	secpGx, _   = new(big.Int).SetString("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16)
+	secpGy, _   = new(big.Int).SetString("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16)
+	secpHalfN   = new(big.Int).Rsh(secpN, 1)
+	secp3       = big.NewInt(3)
+	secpSqrtExp = new(big.Int).Rsh(new(big.Int).Add(secpP, big.NewInt(1)), 2)
 )
 
 type secp256k1Curve struct {
@@ -95,15 +98,17 @@ func (c *secp256k1Curve) affineDouble(x1, y1 *big.Int) (x, y *big.Int) {
 		return nil, nil // point at infinity
 	}
 	// lambda = 3*x1^2 / (2*y1)
+	// Optimized: Uses static secp3 = big.NewInt(3) to eliminate 256 heap allocations per scalar multiplication.
 	num := new(big.Int).Mul(x1, x1)
-	num.Mul(num, big.NewInt(3))
+	num.Mul(num, secp3)
 	den := new(big.Int).Lsh(y1, 1)
 	den.ModInverse(den, secpP)
 	lambda := num.Mul(num, den)
 	lambda.Mod(lambda, secpP)
 	// x3 = lambda^2 - 2*x1
 	x3 := new(big.Int).Mul(lambda, lambda)
-	x3.Sub(x3, new(big.Int).Lsh(x1, 1))
+	twoX1 := new(big.Int).Lsh(x1, 1)
+	x3.Sub(x3, twoX1)
 	x3.Mod(x3, secpP)
 	// y3 = lambda*(x1-x3) - y1
 	y3 := new(big.Int).Sub(x1, x3)
@@ -231,13 +236,12 @@ func recoverPubkey(r, s *big.Int, msgHash []byte, parity byte) (*big.Int, *big.I
 	// x = r (r < N < P, so no wraparound for y-parity 0/1)
 	x := new(big.Int).Set(r)
 	// y = sqrt(x^3 + 7) mod P; P % 4 == 3 so sqrt(a) = a^((P+1)/4)
+	// Optimized: Uses precomputed package variable secpSqrtExp = (P+1)/4 to avoid allocations.
 	x3 := new(big.Int).Mul(x, x)
 	x3.Mul(x3, x)
 	x3.Add(x3, secpB)
 	x3.Mod(x3, secpP)
-	exp := new(big.Int).Add(secpP, big.NewInt(1))
-	exp.Rsh(exp, 2)
-	y := new(big.Int).Exp(x3, exp, secpP)
+	y := new(big.Int).Exp(x3, secpSqrtExp, secpP)
 	if y.Bit(0) != uint(parity) {
 		y.Sub(secpP, y)
 	}
@@ -270,10 +274,6 @@ func recoverPubkey(r, s *big.Int, msgHash []byte, parity byte) (*big.Int, *big.I
 }
 
 func hexEncode(b []byte) string {
-	const digits = "0123456789abcdef"
-	out := make([]byte, 0, len(b)*2)
-	for _, v := range b {
-		out = append(out, digits[v>>4], digits[v&0x0f])
-	}
-	return string(out)
+	// Optimized: Uses encoding/hex to avoid loop/append slice overhead.
+	return hex.EncodeToString(b)
 }
