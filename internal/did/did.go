@@ -13,7 +13,7 @@ const (
 
 var (
 	ed25519Multicodec = []byte{0xed, 0x01}
-	b58Indexes        [256]int
+	b58Indexes        [256]int8
 )
 
 func init() {
@@ -21,14 +21,20 @@ func init() {
 		b58Indexes[i] = -1
 	}
 	for i, c := range b58Alphabet {
-		b58Indexes[c] = i
+		b58Indexes[c] = int8(i)
 	}
 }
 
 // EncodeBase58 encodes a byte slice into Bitcoin base58.
 func EncodeBase58(input []byte) string {
+	return EncodeBase58WithPrefix("", input)
+}
+
+// EncodeBase58WithPrefix encodes input into Bitcoin base58 with a string prefix,
+// producing a single string allocation.
+func EncodeBase58WithPrefix(prefix string, input []byte) string {
 	if len(input) == 0 {
-		return ""
+		return prefix
 	}
 
 	zeros := 0
@@ -47,18 +53,23 @@ func EncodeBase58(input []byte) string {
 	}
 
 	high := size - 1
+	if size > 0 {
+		_ = out[size-1]
+	}
 	for _, b := range input[zeros:] {
 		carry := int(b)
 		for j := size - 1; j >= high; j-- {
 			carry += 256 * int(out[j])
-			out[j] = byte(carry % 58)
-			carry /= 58
+			q := carry / 58
+			out[j] = byte(carry - q*58)
+			carry = q
 		}
 		for carry > 0 {
 			high--
 			carry += 256 * int(out[high])
-			out[high] = byte(carry % 58)
-			carry /= 58
+			q := carry / 58
+			out[high] = byte(carry - q*58)
+			carry = q
 		}
 	}
 
@@ -67,18 +78,28 @@ func EncodeBase58(input []byte) string {
 		p++
 	}
 
-	resLen := zeros + (size - p)
-	var sb strings.Builder
-	sb.Grow(resLen)
+	resLen := len(prefix) + zeros + (size - p)
+	var resBuf [128]byte
+	var res []byte
+	if resLen <= len(resBuf) {
+		res = resBuf[:resLen]
+	} else {
+		res = make([]byte, resLen)
+	}
+
+	copy(res, prefix)
+	idx := len(prefix)
 	for i := 0; i < zeros; i++ {
-		sb.WriteByte(b58Alphabet[0])
+		res[idx] = b58Alphabet[0]
+		idx++
 	}
 	for p < size {
-		sb.WriteByte(b58Alphabet[out[p]])
+		res[idx] = b58Alphabet[out[p]]
+		idx++
 		p++
 	}
 
-	return sb.String()
+	return string(res)
 }
 
 // DecodeBase58 decodes a Bitcoin base58 encoded string.
@@ -103,9 +124,12 @@ func DecodeBase58(input string) ([]byte, error) {
 	}
 
 	high := size - 1
+	if size > 0 {
+		_ = out[size-1]
+	}
 	for i := zeros; i < len(input); i++ {
-		idx := b58Indexes[input[i]]
-		if idx == -1 {
+		idx := int(b58Indexes[input[i]])
+		if idx < 0 {
 			return nil, fmt.Errorf("invalid base58 character: %c", input[i])
 		}
 		carry := idx
@@ -137,22 +161,22 @@ func FromVerifyingKey(pubKey ed25519.PublicKey) string {
 	copy(prefixed[0:], ed25519Multicodec)
 	copy(prefixed[2:], pubKey)
 
-	encoded := EncodeBase58(prefixed[:])
-	return "did:key:z" + encoded
+	return EncodeBase58WithPrefix("did:key:z", prefixed[:])
 }
 
 // ToVerifyingKey extracts the Ed25519 public key from a did:key string.
 func ToVerifyingKey(did string) (ed25519.PublicKey, error) {
-	if !strings.HasPrefix(did, "did:key:") {
+	const prefix = "did:key:"
+	if len(did) < len(prefix)+1 || !strings.HasPrefix(did, prefix) {
 		return nil, errors.New("expected did:key prefix")
 	}
 
-	methodID := strings.TrimPrefix(did, "did:key:")
+	methodID := did[len(prefix):]
 	if len(methodID) > 64 {
 		return nil, errors.New("did:key method-specific id too long")
 	}
 
-	if !strings.HasPrefix(methodID, "z") {
+	if methodID[0] != 'z' {
 		return nil, errors.New("missing multibase 'z' prefix")
 	}
 
@@ -201,7 +225,7 @@ type VerificationMethod struct {
 
 // NewDIDDocument creates a DID document for a did:key.
 func NewDIDDocument(did string) *DIDDocument {
-	vmID := fmt.Sprintf("%s#%s", did, ShortDID(did))
+	vmID := did + "#" + ShortDID(did)
 	multibaseKey := strings.TrimPrefix(did, "did:key:")
 
 	return &DIDDocument{
