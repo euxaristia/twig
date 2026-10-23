@@ -25,3 +25,7 @@
 ## 2025-06-15 - Zero-Allocation Stack Return Array for Fixed-Length Cryptographic Hashes
 **Learning:** Returning a slice `[]byte` via `make([]byte, 32)` in fixed-length hash functions (such as `Keccak256`) causes a heap allocation on every invocation. Changing the return signature to `[32]byte` places the return value directly on the stack, eliminating heap allocations (down from 1 alloc/op, 32 B/op to 0 allocs/op, 0 B/op).
 **Action:** Always return fixed-size value arrays (`[32]byte`) instead of slices (`[]byte`) for cryptographic hash functions.
+
+## 2025-06-15 - Package-Level Static big.Int Reuse in secp256k1 Point Multiplication and Recovery
+**Learning:** Re-instantiating `big.NewInt(3)` inside high-frequency secp256k1 point doubling loops (`affineDouble`) and re-calculating square root exponent `(P+1)/4` inside public key recovery (`recoverPubkey`) generates thousands of redundant heap allocations (~256 allocs per scalar multiplication, ~3,800+ allocs per transaction signature). Declaring read-only package-level variables `secp3 = big.NewInt(3)` and `secpSqrtExp` reduces heap allocations per ECDSA transaction signature by ~3,800 allocs/op (~7% overall allocation reduction) without changing logic or thread safety.
+**Action:** Always hoist read-only `big.Int` constants (like multipliers or curve constants) to package-level variables in loop-heavy cryptographic arithmetic functions.

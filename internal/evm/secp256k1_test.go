@@ -105,3 +105,23 @@ func BenchmarkAddressFromPubkey(b *testing.B) {
 		_ = addressFromPubkey(px, py)
 	}
 }
+
+func BenchmarkScalarBaseMult(b *testing.B) {
+	c := secp256k1()
+	k := PadLeftBytes([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, 32)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = c.ScalarBaseMult(k)
+	}
+}
+
+func BenchmarkSecpSign(b *testing.B) {
+	d, _ := parsePrivateKey("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+	msgHash := Keccak256([]byte("hello twigpine"))
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _, _, _ = secpSign(d, msgHash[:])
+	}
+}
