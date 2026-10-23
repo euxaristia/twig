@@ -114,3 +114,38 @@ func TestUcanNotBefore(t *testing.T) {
 		t.Fatalf("expected token with future nbf to return false for IsValid()")
 	}
 }
+
+func TestUcanDecodeJSONAndNilFieldNormalization(t *testing.T) {
+	kp, err := identity.GenerateKeypair()
+	if err != nil {
+		t.Fatalf("generate keypair failed: %v", err)
+	}
+
+	token, err := Issue(
+		kp,
+		kp.DID(),
+		[]Capability{{With: "twigpine://test", Can: "read"}},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("issue failed: %v", err)
+	}
+
+	encoded, err := token.Encode()
+	if err != nil {
+		t.Fatalf("encode failed: %v", err)
+	}
+
+	// Decoding raw JSON string directly without Stat
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+
+	// Force nil Prf (simulating omitted "prf" array during unmarshaling)
+	decoded.Payload.Prf = nil
+
+	if err := decoded.VerifySignature(); err != nil {
+		t.Fatalf("VerifySignature should succeed after normalizing nil Prf: %v", err)
+	}
+}

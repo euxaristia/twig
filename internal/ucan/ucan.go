@@ -120,7 +120,15 @@ func (u *Ucan) VerifySignature() error {
 		return fmt.Errorf("invalid issuer DID: %w", err)
 	}
 
-	payloadBytes, err := json.Marshal(u.Payload)
+	payload := u.Payload
+	if payload.Prf == nil {
+		payload.Prf = []string{}
+	}
+	if payload.Att == nil {
+		payload.Att = []Capability{}
+	}
+
+	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
@@ -155,13 +163,17 @@ func Decode(input string) (*Ucan, error) {
 	trimmed := strings.TrimSpace(input)
 	var data []byte
 
-	// Check if input is a file path
-	if _, err := os.Stat(trimmed); err == nil {
-		fileBytes, err := os.ReadFile(trimmed)
-		if err != nil {
-			return nil, fmt.Errorf("reading token file: %w", err)
+	// Check if input is a file path (only when not direct JSON string)
+	if !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") {
+		if _, err := os.Stat(trimmed); err == nil {
+			fileBytes, err := os.ReadFile(trimmed)
+			if err != nil {
+				return nil, fmt.Errorf("reading token file: %w", err)
+			}
+			data = fileBytes
+		} else {
+			data = []byte(trimmed)
 		}
-		data = fileBytes
 	} else {
 		data = []byte(trimmed)
 	}

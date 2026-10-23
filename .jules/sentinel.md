@@ -1,3 +1,8 @@
+## 2025-05-22 - Normalize UCAN Token Slices and Prevent Filesystem Probing on JSON Input
+**Vulnerability:** `ucan.Decode()` executed `os.Stat()` on raw token input before checking if it was JSON text, allowing raw JSON token strings to trigger filesystem syscalls. Additionally, unmarshaling tokens with omitted/null `prf` or `att` fields caused `VerifySignature()` to serialize them as `null` rather than `[]`, invalidating legitimate signatures.
+**Learning:** Functions accepting both inline JSON and file paths must check for leading JSON indicators (`{` or `[`) before attempting file system lookups. Cryptographic signature verification over structs must normalize `nil` slice fields to empty non-nil slices before re-marshaling JSON.
+**Prevention:** Always check prefix for JSON structures before file operations, and ensure nil slice fields are normalized before signature verification.
+
 ## 2025-05-21 - Escape Dynamic URL Path Parameters in CLI API Requests
 **Vulnerability:** Dynamic path parameters (`owner`, `name`, `issueID`, `certID`, `bountyID`, `taskID`, `targetDID`, `cid`) formatted directly into HTTP endpoint URLs in CLI commands enabled path traversal (`../`) and API route injection against remote node endpoints.
 **Learning:** Even if the MCP server implementation applies URL path escaping, CLI command endpoints constructing raw Sprintf URL paths must also consistently apply `url.PathEscape` and `url.QueryEscape`.
