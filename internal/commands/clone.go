@@ -17,6 +17,9 @@ import (
 
 // Clone clones a Twigpine repository, configuring sparse-checkout if private subtrees are withheld.
 func Clone(repoInput, destDir, branch, nodeURL, arweaveGateway, ipfsGateway string) error {
+	if strings.HasPrefix(strings.TrimSpace(repoInput), "-") {
+		return fmt.Errorf("invalid repository input %q: repo cannot start with '-'", repoInput)
+	}
 	if strings.HasPrefix(destDir, "-") {
 		return fmt.Errorf("invalid destination directory %q: directory cannot start with '-'", destDir)
 	}
