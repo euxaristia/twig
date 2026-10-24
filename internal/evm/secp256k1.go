@@ -61,61 +61,134 @@ func (c *secp256k1Curve) IsOnCurve(x, y *big.Int) bool {
 	return y2.Cmp(x3) == 0
 }
 
-func (c *secp256k1Curve) affineAdd(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
+type secpScratch struct {
+	t1, t2, t3, lambda big.Int
+}
+
+func (c *secp256k1Curve) affineDoubleScratch(x1, y1 *big.Int, s *secpScratch) (x, y *big.Int) {
+	if x1 == nil || y1 == nil || y1.Sign() == 0 {
+		return nil, nil // point at infinity
+	}
+	// lambda = 3*x1^2 / (2*y1)
+	s.t1.Mul(x1, x1)
+	s.t1.Mul(&s.t1, secp3)
+	s.t2.Lsh(y1, 1)
+	s.t2.ModInverse(&s.t2, secpP)
+	s.lambda.Mul(&s.t1, &s.t2)
+	s.lambda.Mod(&s.lambda, secpP)
+	// x3 = lambda^2 - 2*x1
+	s.t3.Mul(&s.lambda, &s.lambda)
+	s.t1.Lsh(x1, 1)
+	s.t3.Sub(&s.t3, &s.t1)
+	s.t3.Mod(&s.t3, secpP)
+	// y3 = lambda*(x1-x3) - y1
+	s.t1.Sub(x1, &s.t3)
+	s.t1.Mul(&s.lambda, &s.t1)
+	s.t1.Sub(&s.t1, y1)
+	s.t1.Mod(&s.t1, secpP)
+	return new(big.Int).Set(&s.t3), new(big.Int).Set(&s.t1)
+}
+
+func (c *secp256k1Curve) affineDoubleInPlace(rx, ry *big.Int, s *secpScratch) bool {
+	if rx == nil || ry == nil || ry.Sign() == 0 {
+		return false // point at infinity
+	}
+	// lambda = 3*rx^2 / (2*ry)
+	s.t1.Mul(rx, rx)
+	s.t1.Mul(&s.t1, secp3)
+	s.t2.Lsh(ry, 1)
+	s.t2.ModInverse(&s.t2, secpP)
+	s.lambda.Mul(&s.t1, &s.t2)
+	s.lambda.Mod(&s.lambda, secpP)
+	// x3 = lambda^2 - 2*rx
+	s.t3.Mul(&s.lambda, &s.lambda)
+	s.t1.Lsh(rx, 1)
+	s.t3.Sub(&s.t3, &s.t1)
+	s.t3.Mod(&s.t3, secpP)
+	// y3 = lambda*(rx-x3) - ry
+	s.t1.Sub(rx, &s.t3)
+	s.t1.Mul(&s.lambda, &s.t1)
+	s.t1.Sub(&s.t1, ry)
+	s.t1.Mod(&s.t1, secpP)
+	rx.Set(&s.t3)
+	ry.Set(&s.t1)
+	return true
+}
+
+func (c *secp256k1Curve) affineAddScratch(x1, y1, x2, y2 *big.Int, s *secpScratch) (x, y *big.Int) {
 	if x1 == nil || y1 == nil {
-		return x2, y2
+		if x2 == nil || y2 == nil {
+			return nil, nil
+		}
+		return new(big.Int).Set(x2), new(big.Int).Set(y2)
 	}
 	if x2 == nil || y2 == nil {
-		return x1, y1
+		return new(big.Int).Set(x1), new(big.Int).Set(y1)
 	}
 	if x1.Cmp(x2) == 0 {
 		if y1.Cmp(y2) != 0 {
 			return nil, nil // point at infinity
 		}
-		return c.affineDouble(x1, y1)
+		return c.affineDoubleScratch(x1, y1, s)
 	}
 	// lambda = (y2-y1)/(x2-x1)
-	num := new(big.Int).Sub(y2, y1)
-	den := new(big.Int).Sub(x2, x1)
-	den.ModInverse(den, secpP)
-	lambda := num.Mul(num, den)
-	lambda.Mod(lambda, secpP)
+	s.t1.Sub(y2, y1)
+	s.t2.Sub(x2, x1)
+	s.t2.ModInverse(&s.t2, secpP)
+	s.lambda.Mul(&s.t1, &s.t2)
+	s.lambda.Mod(&s.lambda, secpP)
 	// x3 = lambda^2 - x1 - x2
-	x3 := new(big.Int).Mul(lambda, lambda)
-	x3.Sub(x3, x1)
-	x3.Sub(x3, x2)
-	x3.Mod(x3, secpP)
+	s.t3.Mul(&s.lambda, &s.lambda)
+	s.t3.Sub(&s.t3, x1)
+	s.t3.Sub(&s.t3, x2)
+	s.t3.Mod(&s.t3, secpP)
 	// y3 = lambda*(x1-x3) - y1
-	y3 := new(big.Int).Sub(x1, x3)
-	y3.Mul(lambda, y3)
-	y3.Sub(y3, y1)
-	y3.Mod(y3, secpP)
-	return x3, y3
+	s.t1.Sub(x1, &s.t3)
+	s.t1.Mul(&s.lambda, &s.t1)
+	s.t1.Sub(&s.t1, y1)
+	s.t1.Mod(&s.t1, secpP)
+	return new(big.Int).Set(&s.t3), new(big.Int).Set(&s.t1)
+}
+
+func (c *secp256k1Curve) affineAddInPlace(rx, ry, x2, y2 *big.Int, s *secpScratch) bool {
+	if rx == nil || ry == nil || x2 == nil || y2 == nil {
+		return false // point at infinity
+	}
+	if rx.Cmp(x2) == 0 {
+		if ry.Cmp(y2) != 0 {
+			return false // point at infinity
+		}
+		return c.affineDoubleInPlace(rx, ry, s)
+	}
+	// lambda = (y2-ry)/(x2-rx)
+	s.t1.Sub(y2, ry)
+	s.t2.Sub(x2, rx)
+	s.t2.ModInverse(&s.t2, secpP)
+	s.lambda.Mul(&s.t1, &s.t2)
+	s.lambda.Mod(&s.lambda, secpP)
+	// x3 = lambda^2 - rx - x2
+	s.t3.Mul(&s.lambda, &s.lambda)
+	s.t3.Sub(&s.t3, rx)
+	s.t3.Sub(&s.t3, x2)
+	s.t3.Mod(&s.t3, secpP)
+	// y3 = lambda*(rx-x3) - ry
+	s.t1.Sub(rx, &s.t3)
+	s.t1.Mul(&s.lambda, &s.t1)
+	s.t1.Sub(&s.t1, ry)
+	s.t1.Mod(&s.t1, secpP)
+	rx.Set(&s.t3)
+	ry.Set(&s.t1)
+	return true
+}
+
+func (c *secp256k1Curve) affineAdd(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
+	var scratch secpScratch
+	return c.affineAddScratch(x1, y1, x2, y2, &scratch)
 }
 
 func (c *secp256k1Curve) affineDouble(x1, y1 *big.Int) (x, y *big.Int) {
-	if x1 == nil || y1 == nil || y1.Sign() == 0 {
-		return nil, nil // point at infinity
-	}
-	// lambda = 3*x1^2 / (2*y1)
-	// Optimized: Uses static secp3 = big.NewInt(3) to eliminate 256 heap allocations per scalar multiplication.
-	num := new(big.Int).Mul(x1, x1)
-	num.Mul(num, secp3)
-	den := new(big.Int).Lsh(y1, 1)
-	den.ModInverse(den, secpP)
-	lambda := num.Mul(num, den)
-	lambda.Mod(lambda, secpP)
-	// x3 = lambda^2 - 2*x1
-	x3 := new(big.Int).Mul(lambda, lambda)
-	twoX1 := new(big.Int).Lsh(x1, 1)
-	x3.Sub(x3, twoX1)
-	x3.Mod(x3, secpP)
-	// y3 = lambda*(x1-x3) - y1
-	y3 := new(big.Int).Sub(x1, x3)
-	y3.Mul(lambda, y3)
-	y3.Sub(y3, y1)
-	y3.Mod(y3, secpP)
-	return x3, y3
+	var scratch secpScratch
+	return c.affineDoubleScratch(x1, y1, &scratch)
 }
 
 func (c *secp256k1Curve) Add(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
@@ -126,18 +199,29 @@ func (c *secp256k1Curve) Double(x1, y1 *big.Int) (x, y *big.Int) {
 	return c.affineDouble(x1, y1)
 }
 
+// ScalarMult computes k*(x1, y1).
+// Optimized: Uses single secpScratch struct and in-place point operations during loop
+// iterations to eliminate thousands of big.Int heap allocations per scalar multiplication.
 func (c *secp256k1Curve) ScalarMult(x1, y1 *big.Int, k []byte) (x, y *big.Int) {
+	if x1 == nil || y1 == nil {
+		return nil, nil
+	}
 	var rx, ry *big.Int
+	var scratch secpScratch
 	for _, b := range k {
 		for i := 7; i >= 0; i-- {
 			if rx != nil {
-				rx, ry = c.affineDouble(rx, ry)
+				if !c.affineDoubleInPlace(rx, ry, &scratch) {
+					rx, ry = nil, nil
+				}
 			}
 			if (b>>uint(i))&1 == 1 {
 				if rx == nil {
 					rx, ry = new(big.Int).Set(x1), new(big.Int).Set(y1)
 				} else {
-					rx, ry = c.affineAdd(rx, ry, x1, y1)
+					if !c.affineAddInPlace(rx, ry, x1, y1, &scratch) {
+						rx, ry = nil, nil
+					}
 				}
 			}
 		}
