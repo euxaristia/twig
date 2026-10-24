@@ -54,6 +54,47 @@ func TestPrivateKeyValidation(t *testing.T) {
 	}
 }
 
+func TestSecp256k1EdgeCases(t *testing.T) {
+	c := secp256k1()
+
+	// ScalarMult with nil inputs
+	x, y := c.ScalarMult(nil, nil, []byte{1})
+	if x != nil || y != nil {
+		t.Fatalf("expected nil, nil for nil ScalarMult")
+	}
+
+	// Double with nil inputs
+	x, y = c.Double(nil, nil)
+	if x != nil || y != nil {
+		t.Fatalf("expected nil, nil for nil Double")
+	}
+
+	// Double with y = 0
+	x, y = c.Double(secpGx, big.NewInt(0))
+	if x != nil || y != nil {
+		t.Fatalf("expected nil, nil for y=0 Double")
+	}
+
+	// Add with nil inputs
+	x, y = c.Add(nil, nil, secpGx, secpGy)
+	if x.Cmp(secpGx) != 0 || y.Cmp(secpGy) != 0 {
+		t.Fatalf("expected G for Add(nil, G)")
+	}
+
+	x, y = c.Add(secpGx, secpGy, nil, nil)
+	if x.Cmp(secpGx) != 0 || y.Cmp(secpGy) != 0 {
+		t.Fatalf("expected G for Add(G, nil)")
+	}
+
+	// Add inverse point (y2 = -y1 mod P) -> point at infinity
+	negGy := new(big.Int).Neg(secpGy)
+	negGy.Mod(negGy, secpP)
+	x, y = c.Add(secpGx, secpGy, secpGx, negGy)
+	if x != nil || y != nil {
+		t.Fatalf("expected nil, nil for Add(P, -P)")
+	}
+}
+
 func TestSecpSignAndRecover(t *testing.T) {
 	d, err := parsePrivateKey("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	if err != nil {
