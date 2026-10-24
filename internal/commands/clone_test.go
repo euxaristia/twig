@@ -6,6 +6,16 @@ import (
 )
 
 func TestCloneOptionInjection(t *testing.T) {
+	t.Run("invalid repoInput", func(t *testing.T) {
+		err := Clone("--upload-pack=evil", "my-repo", "", "", "", "")
+		if err == nil {
+			t.Fatal("expected error for flag-like repoInput, got nil")
+		}
+		if !strings.Contains(err.Error(), "cannot start with '-'") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
 	t.Run("invalid destDir", func(t *testing.T) {
 		err := Clone("owner/repo", "--upload-pack=evil", "", "", "", "")
 		if err == nil {
