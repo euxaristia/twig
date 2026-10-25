@@ -43,6 +43,20 @@ func GitURLScheme() string {
 	return "twigpine"
 }
 
+// ValidateEndpointURL verifies that an external URL input is non-empty, well-formed,
+// has an http or https scheme, and contains a valid host.
+func ValidateEndpointURL(rawURL string) error {
+	trimmed := strings.TrimSpace(rawURL)
+	if trimmed == "" {
+		return errors.New("URL cannot be empty")
+	}
+	u, err := url.Parse(trimmed)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("invalid URL %q: must be a valid HTTP or HTTPS URL", rawURL)
+	}
+	return nil
+}
+
 // FormatGitURL builds a repository git URL using the scheme of the installed
 // remote helper, so the URL is usable with the helper on PATH.
 func FormatGitURL(owner, repo string) string {

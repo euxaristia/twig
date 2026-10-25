@@ -23,6 +23,10 @@ func PeerList(nodeURL string) error {
 
 // PeerAdd announces this node to a peer node.
 func PeerAdd(peerURL, nodeURL, dirOverride string) error {
+	if err := client.ValidateEndpointURL(peerURL); err != nil {
+		return fmt.Errorf("invalid peer URL: %w", err)
+	}
+
 	kp, err := EnsureIdentityExists(dirOverride)
 	if err != nil {
 		return err
