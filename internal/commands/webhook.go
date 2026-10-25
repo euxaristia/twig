@@ -11,6 +11,10 @@ import (
 
 // WebhookCreate creates a webhook for a repository.
 func WebhookCreate(repoInput, webhookURL, events, secret, nodeURL, dirOverride string) error {
+	if err := client.ValidateEndpointURL(webhookURL); err != nil {
+		return fmt.Errorf("invalid webhook URL: %w", err)
+	}
+
 	owner, name, err := ResolveRepoOwner(repoInput, dirOverride)
 	if err != nil {
 		return err

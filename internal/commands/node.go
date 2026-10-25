@@ -229,6 +229,9 @@ func stakingCallData(sig string, didHash [32]byte) []byte {
 
 // NodeRegisterOnchain registers a node on-chain with stake.
 func NodeRegisterOnchain(stake uint64, httpURL, privateKey, rpcURL, contractAddr, tokenAddr, dirOverride string) error {
+	if err := client.ValidateEndpointURL(httpURL); err != nil {
+		return fmt.Errorf("invalid node HTTP URL: %w", err)
+	}
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
 	}

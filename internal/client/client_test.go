@@ -12,6 +12,36 @@ import (
 	"github.com/Twigpine/twig/internal/identity"
 )
 
+func TestValidateEndpointURL(t *testing.T) {
+	validURLs := []string{
+		"http://localhost:8080",
+		"http://127.0.0.1:3000/webhook",
+		"https://example.com",
+		"https://sub.domain.org/api/v1/hook?key=val",
+	}
+	for _, u := range validURLs {
+		if err := ValidateEndpointURL(u); err != nil {
+			t.Errorf("expected valid URL %q, got error: %v", u, err)
+		}
+	}
+
+	invalidURLs := []string{
+		"",
+		"   ",
+		"javascript:alert(1)",
+		"file:///etc/passwd",
+		"ftp://example.com/file",
+		"http://",
+		"https://",
+		"justastring",
+	}
+	for _, u := range invalidURLs {
+		if err := ValidateEndpointURL(u); err == nil {
+			t.Errorf("expected error for invalid URL %q, got nil", u)
+		}
+	}
+}
+
 func TestResolveNodeURLDefault(t *testing.T) {
 	t.Setenv("TWIGPINE_NODE", "")
 	t.Setenv("GITLAWB_NODE", "")

@@ -1,3 +1,8 @@
+## 2025-05-23 - Validate External Endpoint URLs in CLI Commands
+**Vulnerability:** External endpoint URLs provided via CLI arguments (webhooks, repository replicas, peer nodes, on-chain node HTTP endpoints) were processed, stored, or transmitted without validating scheme or host, allowing arbitrary non-HTTP schemes (e.g. `javascript:`, `file:///`) or malformed strings.
+**Learning:** Functions accepting user-provided URLs for webhooks, peers, or replica endpoints must validate the parsed URL scheme (`http` or `https`) and confirm a non-empty `Host` before issuing HTTP calls or submitting transactions.
+**Prevention:** Use `client.ValidateEndpointURL` on all user-supplied endpoint URL parameters prior to processing or transmitting them.
+
 ## 2025-05-22 - Normalize UCAN Token Slices and Prevent Filesystem Probing on JSON Input
 **Vulnerability:** `ucan.Decode()` executed `os.Stat()` on raw token input before checking if it was JSON text, allowing raw JSON token strings to trigger filesystem syscalls. Additionally, unmarshaling tokens with omitted/null `prf` or `att` fields caused `VerifySignature()` to serialize them as `null` rather than `[]`, invalidating legitimate signatures.
 **Learning:** Functions accepting both inline JSON and file paths must check for leading JSON indicators (`{` or `[`) before attempting file system lookups. Cryptographic signature verification over structs must normalize `nil` slice fields to empty non-nil slices before re-marshaling JSON.

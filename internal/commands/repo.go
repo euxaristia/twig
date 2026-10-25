@@ -279,6 +279,10 @@ func RepoOwner(repoInput, nodeURL, dirOverride string, outputJSON bool) error {
 
 // RepoReplicaRegister registers a replica node for a repository.
 func RepoReplicaRegister(repoInput, replicaURL, nodeURL, dirOverride string) error {
+	if err := client.ValidateEndpointURL(replicaURL); err != nil {
+		return fmt.Errorf("invalid replica URL: %w", err)
+	}
+
 	owner, name, err := ResolveRepoOwner(repoInput, dirOverride)
 	if err != nil {
 		return err
