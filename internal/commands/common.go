@@ -74,18 +74,24 @@ func ResolveRepoOwner(repoInput, dir string) (string, string, error) {
 	}
 	repoInput = strings.TrimRight(repoInput, "/")
 
+	var owner, repo string
 	if strings.Contains(repoInput, "/") {
 		parts := strings.SplitN(repoInput, "/", 2)
-		return parts[0], parts[1], nil
+		owner, repo = parts[0], parts[1]
+	} else {
+		// Try loading identity
+		kp, err := identity.LoadKeypair(dir)
+		if err != nil {
+			return "", "", fmt.Errorf("repo must be in owner/name format, or an identity must exist: %s", repoInput)
+		}
+		owner, repo = did.ShortDID(kp.DID()), repoInput
 	}
 
-	// Try loading identity
-	kp, err := identity.LoadKeypair(dir)
-	if err == nil {
-		return did.ShortDID(kp.DID()), repoInput, nil
+	if strings.HasPrefix(owner, "-") || strings.HasPrefix(repo, "-") {
+		return "", "", fmt.Errorf("invalid repository input %q: owner and repo name cannot start with '-'", repoInput)
 	}
 
-	return "", "", fmt.Errorf("repo must be in owner/name format, or an identity must exist: %s", repoInput)
+	return owner, repo, nil
 }
 
 // DetectGitRemote attempts to detect a twigpine:// or gitlawb:// remote from current git directory.
