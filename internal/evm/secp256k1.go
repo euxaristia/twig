@@ -272,7 +272,9 @@ func PrivateKeyToAddress(hexKey string) (string, error) {
 		return "", err
 	}
 	curve := secp256k1()
-	x, y := curve.ScalarBaseMult(PadLeftBytes(d.Bytes(), 32))
+	var dBuf [32]byte
+	d.FillBytes(dBuf[:])
+	x, y := curve.ScalarBaseMult(dBuf[:])
 	addr := addressFromPubkey(x, y)
 	return "0x" + hexEncode(addr[:]), nil
 }
@@ -282,7 +284,9 @@ func PrivateKeyToAddress(hexKey string) (string, error) {
 func secpSign(d *big.Int, msgHash []byte) (r, s *big.Int, yParity byte, err error) {
 	curve := secp256k1()
 	priv := &ecdsa.PrivateKey{PublicKey: ecdsa.PublicKey{Curve: curve}, D: d}
-	priv.PublicKey.X, priv.PublicKey.Y = curve.ScalarBaseMult(PadLeftBytes(d.Bytes(), 32))
+	var dBuf [32]byte
+	d.FillBytes(dBuf[:])
+	priv.PublicKey.X, priv.PublicKey.Y = curve.ScalarBaseMult(dBuf[:])
 	r, s, err = ecdsa.Sign(rand.Reader, priv, msgHash)
 	if err != nil {
 		return nil, nil, 0, err
@@ -341,9 +345,14 @@ func recoverPubkey(r, s *big.Int, msgHash []byte, parity byte) (*big.Int, *big.I
 		return nil, nil, errors.New("no modular inverse for r")
 	}
 	// s*R
-	sRx, sRy := curve.ScalarMult(x, y, PadLeftBytes(s.Bytes(), 32))
+	// Optimized: Uses FillBytes into stack buffers instead of PadLeftBytes(x.Bytes(), 32)
+	// to eliminate temporary byte slice heap allocations during public key recovery.
+	var sBuf, eBuf, rInvBuf [32]byte
+	s.FillBytes(sBuf[:])
+	sRx, sRy := curve.ScalarMult(x, y, sBuf[:])
 	// e*G
-	eGx, eGy := curve.ScalarBaseMult(PadLeftBytes(e.Bytes(), 32))
+	e.FillBytes(eBuf[:])
+	eGx, eGy := curve.ScalarBaseMult(eBuf[:])
 	// s*R - e*G
 	neGy := new(big.Int).Neg(eGy)
 	neGy.Mod(neGy, secpP)
@@ -351,7 +360,8 @@ func recoverPubkey(r, s *big.Int, msgHash []byte, parity byte) (*big.Int, *big.I
 	if sx == nil {
 		return nil, nil, errors.New("recovery produced infinity")
 	}
-	qx, qy := curve.ScalarMult(sx, sy, PadLeftBytes(rInv.Bytes(), 32))
+	rInv.FillBytes(rInvBuf[:])
+	qx, qy := curve.ScalarMult(sx, sy, rInvBuf[:])
 	return qx, qy, nil
 }
 

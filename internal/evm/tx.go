@@ -242,7 +242,9 @@ func SendTransaction(rpcURL, privateKeyHex, to string, data []byte) (*TxReceipt,
 	}
 	c := NewClient(rpcURL)
 	curve := secp256k1()
-	px, py := curve.ScalarBaseMult(PadLeftBytes(d.Bytes(), 32))
+	var dBuf [32]byte
+	d.FillBytes(dBuf[:])
+	px, py := curve.ScalarBaseMult(dBuf[:])
 	from := addressFromPubkey(px, py)
 	fromHex := "0x" + hexEncode(from[:])
 
@@ -345,8 +347,11 @@ func EncodeAddressParam(addr string) ([]byte, error) {
 }
 
 // EncodeUint256Param encodes a uint256 argument.
+// Optimized: Allocates single 32-byte slice and uses FillBytes instead of v.Bytes() + PadLeftBytes.
 func EncodeUint256Param(v *big.Int) []byte {
-	return PadLeftBytes(v.Bytes(), 32)
+	out := make([]byte, 32)
+	v.FillBytes(out)
+	return out
 }
 
 // EncodeBytes32Param encodes a bytes32 argument.

@@ -110,7 +110,9 @@ func TestSecpSignAndRecover(t *testing.T) {
 	}
 	// Verify with stdlib ECDSA.
 	curve := secp256k1()
-	px, py := curve.ScalarBaseMult(PadLeftBytes(d.Bytes(), 32))
+	var dBuf [32]byte
+	d.FillBytes(dBuf[:])
+	px, py := curve.ScalarBaseMult(dBuf[:])
 	pub := ecdsa.PublicKey{Curve: curve, X: px, Y: py}
 	if !ecdsa.Verify(&pub, msgHash[:], r, s) {
 		t.Fatalf("ECDSA verification failed")

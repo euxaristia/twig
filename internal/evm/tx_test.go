@@ -164,7 +164,9 @@ func TestSendTransactionFullFlow(t *testing.T) {
 
 	d, _ := parsePrivateKey(testPrivKey)
 	curve := secp256k1()
-	px, py := curve.ScalarBaseMult(PadLeftBytes(d.Bytes(), 32))
+	var dBuf [32]byte
+	d.FillBytes(dBuf[:])
+	px, py := curve.ScalarBaseMult(dBuf[:])
 	pub := ecdsa.PublicKey{Curve: curve, X: px, Y: py}
 	if !ecdsa.Verify(&pub, sigHash[:], r, s) {
 		t.Fatalf("transaction signature does not verify")
