@@ -284,3 +284,39 @@ func TestURLPathEscapingInCommands(t *testing.T) {
 		t.Errorf("IpfsGet query = %q, want %q", lastQuery, "scan=token%26admin%3Dtrue")
 	}
 }
+
+func TestResolveRepoOwnerOptionInjection(t *testing.T) {
+	invalidInputs := []string{
+		"owner/--upload-pack=evil",
+		"owner/-oProxyCommand=evil",
+		"-owner/repo",
+		"owner/-repo",
+		" -flag/repo",
+		"twigpine://-flag/repo",
+		"gitlawb://owner/-flag",
+	}
+
+	for _, input := range invalidInputs {
+		_, _, err := ResolveRepoOwner(input, "")
+		if err == nil {
+			t.Errorf("ResolveRepoOwner(%q) expected error for flag-like repo input, got nil", input)
+		} else if !strings.Contains(err.Error(), "cannot start with '-'") {
+			t.Errorf("ResolveRepoOwner(%q) unexpected error: %v", input, err)
+		}
+	}
+
+	// Single segment without identity should fail with owner/name format error
+	_, _, err := ResolveRepoOwner("-flag", "")
+	if err == nil || (!strings.Contains(err.Error(), "owner/name format") && !strings.Contains(err.Error(), "cannot start with '-'")) {
+		t.Errorf("ResolveRepoOwner(\"-flag\") unexpected error: %v", err)
+	}
+
+	// Valid input
+	owner, repo, err := ResolveRepoOwner("owner/my-cool-repo", "")
+	if err != nil {
+		t.Fatalf("ResolveRepoOwner valid input error: %v", err)
+	}
+	if owner != "owner" || repo != "my-cool-repo" {
+		t.Errorf("ResolveRepoOwner valid input got owner=%q, repo=%q", owner, repo)
+	}
+}

@@ -1,3 +1,8 @@
+## 2025-05-24 - Validate Repository Identifier Segments Against Option Injection
+**Vulnerability:** Repository inputs in CLI commands (e.g. `owner/-flag` or `-owner/repo`) permitted repository owner or repository name segments starting with `-`, enabling option injection in downstream `git` commands and file path operations across CLI commands using `ResolveRepoOwner`.
+**Learning:** Checking only top-level repository input strings for leading `-` fails when option-like flags are supplied in multi-part inputs like `owner/-flag`.
+**Prevention:** Validate both resolved `owner` and `repo` name segments in `ResolveRepoOwner` to ensure neither starts with `-`.
+
 ## 2025-05-23 - Validate External Endpoint URLs in CLI Commands
 **Vulnerability:** External endpoint URLs provided via CLI arguments (webhooks, repository replicas, peer nodes, on-chain node HTTP endpoints) were processed, stored, or transmitted without validating scheme or host, allowing arbitrary non-HTTP schemes (e.g. `javascript:`, `file:///`) or malformed strings.
 **Learning:** Functions accepting user-provided URLs for webhooks, peers, or replica endpoints must validate the parsed URL scheme (`http` or `https`) and confirm a non-empty `Host` before issuing HTTP calls or submitting transactions.
