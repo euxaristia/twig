@@ -283,6 +283,17 @@ func TestURLPathEscapingInCommands(t *testing.T) {
 	if lastQuery != "scan=token%26admin%3Dtrue" {
 		t.Errorf("IpfsGet query = %q, want %q", lastQuery, "scan=token%26admin%3Dtrue")
 	}
+
+	// 5. Test BountyList query parameter escaping
+	_ = BountyList("owner/repo&admin=true", "open#active", srv.URL, tempDir)
+	lastPath = requestedRawPaths[len(requestedRawPaths)-1]
+	if lastPath != "/api/v1/bounties" {
+		t.Errorf("BountyList path = %q, want /api/v1/bounties", lastPath)
+	}
+	lastQuery = requestedRawQueries[len(requestedRawQueries)-1]
+	if !strings.Contains(lastQuery, "repo=owner%2Frepo%26admin%3Dtrue") || !strings.Contains(lastQuery, "status=open%23active") {
+		t.Errorf("BountyList query = %q, expected escaped query params", lastQuery)
+	}
 }
 
 func TestResolveRepoOwnerOptionInjection(t *testing.T) {
