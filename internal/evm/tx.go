@@ -348,7 +348,17 @@ func EncodeAddressParam(addr string) ([]byte, error) {
 
 // EncodeUint256Param encodes a uint256 argument.
 // Optimized: Allocates single 32-byte slice and uses FillBytes instead of v.Bytes() + PadLeftBytes.
+//
+// It panics if v is outside the uint256 range [0, 2^256). The check is
+// deliberate: FillBytes alone panics with a less clear message on
+// overflow and silently encodes the absolute value of a negative
+// input. The only in-tree callers pass TokensToWei(uint64) stakes,
+// which cannot leave the range, so the panic is a contract check for
+// future callers rather than a reachable failure.
 func EncodeUint256Param(v *big.Int) []byte {
+	if v.Sign() < 0 || v.BitLen() > 256 {
+		panic(fmt.Sprintf("EncodeUint256Param: value %s is outside the uint256 range [0, 2^256)", v))
+	}
 	out := make([]byte, 32)
 	v.FillBytes(out)
 	return out
