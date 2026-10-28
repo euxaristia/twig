@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -122,30 +123,64 @@ func NewWithTimeout(nodeURL string, keypair *identity.Keypair, timeout time.Dura
 	}
 }
 
+func toUpperASCII(s string) string {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 'a' && s[i] <= 'z' {
+			return strings.ToUpper(s)
+		}
+	}
+	return s
+}
+
 // SignRequest computes RFC 9421 HTTP Signatures headers for an HTTP request.
+// Optimized: Uses fixed stack buffers for base64 header encoding, strconv for integer
+// formatting, and direct byte buffer construction to eliminate redundant string allocations.
 func SignRequest(keypair *identity.Keypair, method, pathAndQuery string, body []byte) (contentDigest, signatureInput, signature string) {
 	created := time.Now().Unix()
 
 	// Content-Digest: sha-256=:base64(sha256(body)):
 	h := sha256.Sum256(body)
-	b64Digest := base64.StdEncoding.EncodeToString(h[:])
-	contentDigest = fmt.Sprintf("sha-256=:%s:", b64Digest)
+	var digestBuf [54]byte
+	copy(digestBuf[:9], "sha-256=:")
+	base64.StdEncoding.Encode(digestBuf[9:53], h[:])
+	digestBuf[53] = ':'
+	contentDigest = string(digestBuf[:])
 
 	did := keypair.DID()
-	sigParamsValue := fmt.Sprintf(`("@method" "@path" "content-digest");keyid="%s";alg="ed25519";created=%d`, did, created)
-	signatureInput = fmt.Sprintf("sig1=%s", sigParamsValue)
 
-	// Signing string format
-	signingString := fmt.Sprintf("\"@method\": %s\n\"@path\": %s\n\"content-digest\": %s\n\"@signature-params\": %s",
-		strings.ToUpper(method),
-		pathAndQuery,
-		contentDigest,
-		sigParamsValue,
-	)
+	var createdBuf [20]byte
+	createdBytes := strconv.AppendInt(createdBuf[:0], created, 10)
 
-	sigBytes := keypair.Sign([]byte(signingString))
-	b64Sig := base64.StdEncoding.EncodeToString(sigBytes)
-	signature = fmt.Sprintf("sig1=:%s:", b64Sig)
+	sigParamsLen := 44 + len(did) + 24 + len(createdBytes)
+	sigParamsBuf := make([]byte, 0, sigParamsLen)
+	sigParamsBuf = append(sigParamsBuf, `("@method" "@path" "content-digest");keyid="`...)
+	sigParamsBuf = append(sigParamsBuf, did...)
+	sigParamsBuf = append(sigParamsBuf, `";alg="ed25519";created=`...)
+	sigParamsBuf = append(sigParamsBuf, createdBytes...)
+
+	signatureInput = "sig1=" + string(sigParamsBuf)
+
+	methodUpper := toUpperASCII(method)
+
+	// RFC 9421 Signing payload construction directly into byte buffer
+	payloadLen := 11 + len(methodUpper) + 10 + len(pathAndQuery) + 19 + len(contentDigest) + 22 + len(sigParamsBuf)
+	payload := make([]byte, 0, payloadLen)
+	payload = append(payload, `"@method": `...)
+	payload = append(payload, methodUpper...)
+	payload = append(payload, "\n\"@path\": "...)
+	payload = append(payload, pathAndQuery...)
+	payload = append(payload, "\n\"content-digest\": "...)
+	payload = append(payload, contentDigest...)
+	payload = append(payload, "\n\"@signature-params\": "...)
+	payload = append(payload, sigParamsBuf...)
+
+	sigBytes := keypair.Sign(payload)
+
+	var sigBuf [95]byte
+	copy(sigBuf[:6], "sig1=:")
+	base64.StdEncoding.Encode(sigBuf[6:94], sigBytes)
+	sigBuf[94] = ':'
+	signature = string(sigBuf[:])
 
 	return contentDigest, signatureInput, signature
 }
