@@ -42,6 +42,22 @@ func TestValidateEndpointURL(t *testing.T) {
 	}
 }
 
+func BenchmarkSignRequest(b *testing.B) {
+	kp, err := identity.GenerateKeypair()
+	if err != nil {
+		b.Fatalf("failed to generate keypair: %v", err)
+	}
+	body := []byte(`{"name":"test-repo","visibility":"public"}`)
+	method := "POST"
+	path := "/api/v1/repos"
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		SignRequest(kp, method, path, body)
+	}
+}
+
 func TestResolveNodeURLDefault(t *testing.T) {
 	t.Setenv("TWIGPINE_NODE", "")
 	t.Setenv("GITLAWB_NODE", "")
