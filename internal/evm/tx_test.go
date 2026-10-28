@@ -208,6 +208,52 @@ func TestSendTransactionInvalidKey(t *testing.T) {
 	}
 }
 
+func TestEncodeUint256Param(t *testing.T) {
+	// Zero and small values encode big-endian into 32 bytes.
+	if got := EncodeUint256Param(big.NewInt(0)); !bytes.Equal(got, make([]byte, 32)) {
+		t.Fatalf("zero: got %x", got)
+	}
+	wantOne := make([]byte, 32)
+	wantOne[31] = 1
+	if got := EncodeUint256Param(big.NewInt(1)); !bytes.Equal(got, wantOne) {
+		t.Fatalf("one: got %x", got)
+	}
+
+	// 2^256 - 1 is the largest in-range value and must not panic.
+	max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	got := EncodeUint256Param(max)
+	if len(got) != 32 {
+		t.Fatalf("max: got %d bytes", len(got))
+	}
+	for i, b := range got {
+		if b != 0xff {
+			t.Fatalf("max: byte %d = %#x, want 0xff", i, b)
+		}
+	}
+}
+
+func TestEncodeUint256ParamOutOfRangePanics(t *testing.T) {
+	cases := map[string]*big.Int{
+		"2^256":     new(big.Int).Lsh(big.NewInt(1), 256),
+		"2^256 + 1": new(big.Int).Add(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1)),
+		"negative":  big.NewInt(-1),
+	}
+	for name, v := range cases {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				r := recover()
+				if r == nil {
+					t.Fatalf("expected panic for %s", name)
+				}
+				if !strings.Contains(r.(string), "outside the uint256 range") {
+					t.Fatalf("panic message should name the contract, got: %v", r)
+				}
+			}()
+			EncodeUint256Param(v)
+		})
+	}
+}
+
 func TestSendTransactionReverted(t *testing.T) {
 	txPollInterval = time.Millisecond
 	txPollTimeout = 5 * time.Second
