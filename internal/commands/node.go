@@ -119,6 +119,9 @@ func NodeOnchainStatus(nodeURL, rpcURL, contractAddr, dirOverride string) error 
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
 	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return fmt.Errorf("invalid RPC URL: %w", err)
+	}
 	if contractAddr == "" {
 		return fmt.Errorf("staking contract address required (set --contract)")
 	}
@@ -215,6 +218,9 @@ func stakingTx(privateKey, rpcURL, contractAddr, dirOverride string, data []byte
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
 	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return nil, didHash, fmt.Errorf("invalid RPC URL: %w", err)
+	}
 	receipt, err := evm.CallContract(rpcURL, privateKey, contractAddr, data)
 	if err != nil {
 		return nil, didHash, err
@@ -234,6 +240,9 @@ func NodeRegisterOnchain(stake uint64, httpURL, privateKey, rpcURL, contractAddr
 	}
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
+	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return fmt.Errorf("invalid RPC URL: %w", err)
 	}
 	if contractAddr == "" {
 		return fmt.Errorf("staking contract address required (set --contract)")

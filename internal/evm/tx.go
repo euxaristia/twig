@@ -13,6 +13,8 @@ import (
 	"math/big"
 	"strings"
 	"time"
+
+	"github.com/Twigpine/twig/internal/client"
 )
 
 // Tunables for receipt polling (overridden in tests).
@@ -236,6 +238,12 @@ func (c *Client) EthGetTransactionReceipt(txHash string) (*TxReceipt, error) {
 // receipt, and returns an error when the transaction reverts. The private key
 // is validated before any RPC call is made.
 func SendTransaction(rpcURL, privateKeyHex, to string, data []byte) (*TxReceipt, error) {
+	if rpcURL == "" {
+		rpcURL = DefaultRPCURL
+	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return nil, fmt.Errorf("invalid RPC URL: %w", err)
+	}
 	d, err := parsePrivateKey(privateKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("invalid private key: %w", err)

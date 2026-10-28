@@ -62,6 +62,22 @@ func TestEVMSameOriginRedirect(t *testing.T) {
 	}
 }
 
+func TestSendTransactionInvalidRPCURL(t *testing.T) {
+	invalidURLs := []string{
+		"ftp://example.com/rpc",
+		"javascript:alert(1)",
+		"http://",
+		"not-a-url",
+	}
+
+	for _, invalidURL := range invalidURLs {
+		_, err := SendTransaction(invalidURL, "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "0x1111111111111111111111111111111111111111", nil)
+		if err == nil {
+			t.Errorf("expected error for invalid RPC URL %q, got nil", invalidURL)
+		}
+	}
+}
+
 func TestABIDecodeMalformedData(t *testing.T) {
 	// Negative offset checks
 	if _, err := DecodeString([]byte("short"), -1); err == nil {
