@@ -275,6 +275,40 @@ func TestNameRegisterInvalidKey(t *testing.T) {
 	}
 }
 
+func TestEVMCommandsInvalidRPCURL(t *testing.T) {
+	invalidURL := "ftp://invalid-rpc.com"
+
+	idDir := t.TempDir()
+	if err := IdentityNew(idDir, false, strings.NewReader("")); err != nil {
+		t.Fatalf("IdentityNew failed: %v", err)
+	}
+
+	if err := NameResolve("alice", invalidURL, stakeContract); err == nil {
+		t.Errorf("expected error for NameResolve with invalid RPC URL")
+	}
+	if err := NameLookup("did:key:z6MksDv", invalidURL, stakeContract); err == nil {
+		t.Errorf("expected error for NameLookup with invalid RPC URL")
+	}
+	if err := NameAvailable("alice", invalidURL, stakeContract); err == nil {
+		t.Errorf("expected error for NameAvailable with invalid RPC URL")
+	}
+	if err := NameResolveDID("did:key:z6MksDv", invalidURL, stakeContract); err == nil {
+		t.Errorf("expected error for NameResolveDID with invalid RPC URL")
+	}
+	if err := NameRegister("alice", stakePrivKey, invalidURL, stakeContract, idDir); err == nil {
+		t.Errorf("expected error for NameRegister with invalid RPC URL")
+	}
+	if err := NameRegisterDID(stakePrivKey, invalidURL, stakeContract, idDir); err == nil {
+		t.Errorf("expected error for NameRegisterDID with invalid RPC URL")
+	}
+	if err := NodeOnchainStatus("", invalidURL, stakeContract, idDir); err == nil {
+		t.Errorf("expected error for NodeOnchainStatus with invalid RPC URL")
+	}
+	if err := NodeRegisterOnchain(1000, "https://node.example", stakePrivKey, invalidURL, stakeContract, stakeToken, idDir); err == nil {
+		t.Errorf("expected error for NodeRegisterOnchain with invalid RPC URL")
+	}
+}
+
 func mustDecodeHex(t *testing.T, s string) []byte {
 	t.Helper()
 	b, err := hex.DecodeString(s)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/did"
 	"github.com/Twigpine/twig/internal/evm"
 )
@@ -14,6 +15,9 @@ import (
 func NameResolve(name, rpcURL, contractAddr string) error {
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
+	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return fmt.Errorf("invalid RPC URL: %w", err)
 	}
 	if contractAddr == "" {
 		contractAddr = evm.DefaultNameRegistry
@@ -60,6 +64,9 @@ func NameLookup(targetDID, rpcURL, contractAddr string) error {
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
 	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return fmt.Errorf("invalid RPC URL: %w", err)
+	}
 	if contractAddr == "" {
 		contractAddr = evm.DefaultNameRegistry
 	}
@@ -93,6 +100,9 @@ func NameAvailable(name, rpcURL, contractAddr string) error {
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
 	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return fmt.Errorf("invalid RPC URL: %w", err)
+	}
 	if contractAddr == "" {
 		contractAddr = evm.DefaultNameRegistry
 	}
@@ -123,6 +133,9 @@ func NameAvailable(name, rpcURL, contractAddr string) error {
 func NameResolveDID(targetDID, rpcURL, contractAddr string) error {
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
+	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return fmt.Errorf("invalid RPC URL: %w", err)
 	}
 	if contractAddr == "" {
 		contractAddr = evm.DefaultDIDRegistry
@@ -164,6 +177,9 @@ func NameRegister(name, privateKey, rpcURL, contractAddr, dirOverride string) er
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
 	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return fmt.Errorf("invalid RPC URL: %w", err)
+	}
 	if contractAddr == "" {
 		contractAddr = evm.DefaultNameRegistry
 	}
@@ -202,6 +218,9 @@ func NameRegisterDID(privateKey, rpcURL, contractAddr, dirOverride string) error
 
 	if rpcURL == "" {
 		rpcURL = evm.DefaultRPCURL
+	}
+	if err := client.ValidateEndpointURL(rpcURL); err != nil {
+		return fmt.Errorf("invalid RPC URL: %w", err)
 	}
 	if contractAddr == "" {
 		contractAddr = evm.DefaultDIDRegistry
