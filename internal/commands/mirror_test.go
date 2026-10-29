@@ -43,3 +43,26 @@ func TestMirrorOptionInjection(t *testing.T) {
 		})
 	}
 }
+
+func TestMirrorInvalidSourceURL(t *testing.T) {
+	invalidURLSources := []string{
+		"file:///etc/passwd",
+		"ftp://example.com/repo.git",
+		"javascript:alert(1)",
+		"http://",
+		"https://",
+		"",
+	}
+
+	for _, src := range invalidURLSources {
+		t.Run(src, func(t *testing.T) {
+			err := Mirror(src, "", "", "", "")
+			if err == nil {
+				t.Fatalf("expected error for invalid URL source %q, got nil", src)
+			}
+			if !strings.Contains(err.Error(), "invalid repository source URL") && !strings.Contains(err.Error(), "cannot start with '-'") {
+				t.Errorf("unexpected error message for %q: %v", src, err)
+			}
+		})
+	}
+}
