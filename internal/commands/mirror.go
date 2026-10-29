@@ -22,6 +22,10 @@ func Mirror(source, repoNameOverride, description, nodeURL, dirOverride string) 
 		return fmt.Errorf("invalid repository name %q: name cannot start with '-'", repoNameOverride)
 	}
 
+	if err := client.ValidateEndpointURL(source); err != nil {
+		return fmt.Errorf("invalid repository source URL: %w", err)
+	}
+
 	kp, err := EnsureIdentityExists(dirOverride)
 	if err != nil {
 		return err
