@@ -133,8 +133,8 @@ func toUpperASCII(s string) string {
 }
 
 // SignRequest computes RFC 9421 HTTP Signatures headers for an HTTP request.
-// Optimized: Uses fixed stack buffers for base64 header encoding, strconv for integer
-// formatting, and direct byte buffer construction to eliminate redundant string allocations.
+// Optimized: Uses fixed stack slice buffers for signature parameters and payload
+// construction, and formats signatureInput directly into a single string allocation.
 func SignRequest(keypair *identity.Keypair, method, pathAndQuery string, body []byte) (contentDigest, signatureInput, signature string) {
 	created := time.Now().Unix()
 
@@ -152,19 +152,42 @@ func SignRequest(keypair *identity.Keypair, method, pathAndQuery string, body []
 	createdBytes := strconv.AppendInt(createdBuf[:0], created, 10)
 
 	sigParamsLen := 44 + len(did) + 24 + len(createdBytes)
-	sigParamsBuf := make([]byte, 0, sigParamsLen)
+	var sigParamsArr [256]byte
+	var sigParamsBuf []byte
+	if sigParamsLen <= len(sigParamsArr) {
+		sigParamsBuf = sigParamsArr[:0]
+	} else {
+		sigParamsBuf = make([]byte, 0, sigParamsLen)
+	}
 	sigParamsBuf = append(sigParamsBuf, `("@method" "@path" "content-digest");keyid="`...)
 	sigParamsBuf = append(sigParamsBuf, did...)
 	sigParamsBuf = append(sigParamsBuf, `";alg="ed25519";created=`...)
 	sigParamsBuf = append(sigParamsBuf, createdBytes...)
 
-	signatureInput = "sig1=" + string(sigParamsBuf)
+	// Format signatureInput ("sig1=" + sigParamsBuf) in a single string allocation
+	var sigInputArr [300]byte
+	var sigInputBuf []byte
+	sigInputLen := 5 + len(sigParamsBuf)
+	if sigInputLen <= len(sigInputArr) {
+		sigInputBuf = sigInputArr[:0]
+	} else {
+		sigInputBuf = make([]byte, 0, sigInputLen)
+	}
+	sigInputBuf = append(sigInputBuf, "sig1="...)
+	sigInputBuf = append(sigInputBuf, sigParamsBuf...)
+	signatureInput = string(sigInputBuf)
 
 	methodUpper := toUpperASCII(method)
 
 	// RFC 9421 Signing payload construction directly into byte buffer
 	payloadLen := 11 + len(methodUpper) + 10 + len(pathAndQuery) + 19 + len(contentDigest) + 22 + len(sigParamsBuf)
-	payload := make([]byte, 0, payloadLen)
+	var payloadArr [512]byte
+	var payload []byte
+	if payloadLen <= len(payloadArr) {
+		payload = payloadArr[:0]
+	} else {
+		payload = make([]byte, 0, payloadLen)
+	}
 	payload = append(payload, `"@method": `...)
 	payload = append(payload, methodUpper...)
 	payload = append(payload, "\n\"@path\": "...)
