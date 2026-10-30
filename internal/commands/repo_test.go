@@ -60,6 +60,25 @@ func TestWriteRepoListLongCells(t *testing.T) {
 	}
 }
 
+func TestRepoCreateOptionInjection(t *testing.T) {
+	err := RepoCreate("-flag", "description", false, "main", "", "")
+	if err == nil || !strings.Contains(err.Error(), "name cannot start with '-'") {
+		t.Errorf("expected error for flag-like repo name, got %v", err)
+	}
+
+	err = RepoCreate("valid-repo", "description", false, "-branch", "", "")
+	if err == nil || !strings.Contains(err.Error(), "branch cannot start with '-'") {
+		t.Errorf("expected error for flag-like branch, got %v", err)
+	}
+}
+
+func TestRepoForkOptionInjection(t *testing.T) {
+	err := RepoFork("owner/repo", "-fork", "", "")
+	if err == nil || !strings.Contains(err.Error(), "name cannot start with '-'") {
+		t.Errorf("expected error for flag-like fork name, got %v", err)
+	}
+}
+
 func TestWriteRepoListJSON(t *testing.T) {
 	body := `[{"name":"project","description":"` + strings.Repeat("x", 201) + `\n\u001b‮","star_count":9007199254740993,"unknown":{"number":9223372036854775807}}]`
 	var out bytes.Buffer

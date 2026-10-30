@@ -1,3 +1,8 @@
+## 2025-05-25 - Validate Repository Creation and Fork Inputs Against Option Injection
+**Vulnerability:** `RepoCreate`, `RepoFork`, `Init`, and MCP `repo_create` accepted flag-like repository names, fork names, and branch parameters starting with `-`, enabling option injection and invalid repository identifier states across downstream Git CLI operations.
+**Learning:** Validating existing repository lookups in `ResolveRepoOwner` is insufficient if endpoints that create or fork new repositories permit flag-like identifiers starting with `-`.
+**Prevention:** Validate that repository names, fork names, and branch parameters do not start with `-` prior to sending creation requests or invoking Git commands.
+
 ## 2025-05-24 - Validate Repository Identifier Segments Against Option Injection
 **Vulnerability:** Repository inputs in CLI commands (e.g. `owner/-flag` or `-owner/repo`) permitted repository owner or repository name segments starting with `-`, enabling option injection in downstream `git` commands and file path operations across CLI commands using `ResolveRepoOwner`.
 **Learning:** Checking only top-level repository input strings for leading `-` fails when option-like flags are supplied in multi-part inputs like `owner/-flag`.

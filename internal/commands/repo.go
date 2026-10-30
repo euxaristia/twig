@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/did"
@@ -15,6 +16,13 @@ import (
 
 // RepoCreate creates a new repository on the node.
 func RepoCreate(name, description string, private bool, branch, nodeURL, dirOverride string) error {
+	if strings.HasPrefix(strings.TrimSpace(name), "-") {
+		return fmt.Errorf("invalid repository name %q: name cannot start with '-'", name)
+	}
+	if strings.HasPrefix(strings.TrimSpace(branch), "-") {
+		return fmt.Errorf("invalid branch %q: branch cannot start with '-'", branch)
+	}
+
 	kp, err := EnsureIdentityExists(dirOverride)
 	if err != nil {
 		return err
@@ -121,6 +129,10 @@ func RepoCommits(repoInput, branch string, limit int, nodeURL, dirOverride strin
 
 // RepoFork forks a repository into the caller's namespace.
 func RepoFork(repoInput, forkName, nodeURL, dirOverride string) error {
+	if strings.HasPrefix(strings.TrimSpace(forkName), "-") {
+		return fmt.Errorf("invalid fork name %q: name cannot start with '-'", forkName)
+	}
+
 	owner, name, err := ResolveRepoOwner(repoInput, dirOverride)
 	if err != nil {
 		return err

@@ -61,6 +61,9 @@ func Init(repoName, description, nodeURL, dirOverride string) error {
 	if repoName == "" {
 		repoName = filepath.Base(cwd)
 	}
+	if strings.HasPrefix(strings.TrimSpace(repoName), "-") {
+		return fmt.Errorf("invalid repository name %q: name cannot start with '-'", repoName)
+	}
 
 	// 5. Create remote repo
 	fmt.Printf("Creating repository %s on %s...\n", repoName, nodeURL)

@@ -232,6 +232,9 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 		if repoName == "" {
 			return "", errors.New("missing 'name'")
 		}
+		if strings.HasPrefix(strings.TrimSpace(repoName), "-") {
+			return "", fmt.Errorf("invalid repository name %q: name cannot start with '-'", repoName)
+		}
 		body, _ := json.Marshal(map[string]interface{}{
 			"name":        repoName,
 			"description": args["description"],
