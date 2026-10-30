@@ -124,3 +124,13 @@ func TestReadMessageExceedsMaxContentLength(t *testing.T) {
 		t.Fatalf("unexpected error message: %v", err)
 	}
 }
+
+func TestRepoCreateOptionInjectionMCP(t *testing.T) {
+	srv := NewServer("https://node.gitlawb.com", nil)
+	_, err := srv.callTool("repo_create", map[string]interface{}{
+		"name": "-flag",
+	})
+	if err == nil || !strings.Contains(err.Error(), "name cannot start with '-'") {
+		t.Errorf("expected error for flag-like repo name in MCP tool call, got %v", err)
+	}
+}
