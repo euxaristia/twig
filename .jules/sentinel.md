@@ -1,3 +1,8 @@
+## 2025-05-26 - Validate Pull Request Branches and Owner Override Against Option Injection
+**Vulnerability:** `PrCreate` and MCP `pr_create` permitted source branch (`head`), target branch (`base`), and `ownerOverride` parameters starting with `-`, allowing flag-like branch names to trigger option injection in downstream Git operations (such as `git fetch`, `git checkout`, or `git merge`) and bypassing repository owner segment checks.
+**Learning:** Checking repository names and default branches on repository creation is not sufficient if pull request endpoints accept unvalidated branch identifiers or allow unvalidated owner overrides that reintroduce option-like flags into Git commands and URL paths.
+**Prevention:** Validate that pull request source branches, target branches, and owner overrides do not start with `-` prior to sending requests to node endpoints.
+
 ## 2025-05-25 - Validate Repository Creation and Fork Inputs Against Option Injection
 **Vulnerability:** `RepoCreate`, `RepoFork`, `Init`, and MCP `repo_create` accepted flag-like repository names, fork names, and branch parameters starting with `-`, enabling option injection and invalid repository identifier states across downstream Git CLI operations.
 **Learning:** Validating existing repository lookups in `ResolveRepoOwner` is insufficient if endpoints that create or fork new repositories permit flag-like identifiers starting with `-`.

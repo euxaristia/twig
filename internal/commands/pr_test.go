@@ -67,3 +67,32 @@ func TestPrCreateSendsBranchFields(t *testing.T) {
 		t.Fatalf("unexpected payload: %v", got)
 	}
 }
+
+func TestPrCreateOptionInjection(t *testing.T) {
+	tempDir := t.TempDir()
+	var stdin bytes.Buffer
+	if err := IdentityNew(tempDir, true, &stdin); err != nil {
+		t.Fatalf("IdentityNew failed: %v", err)
+	}
+
+	cases := []struct {
+		name          string
+		head          string
+		base          string
+		ownerOverride string
+		wantErr       string
+	}{
+		{name: "flag head", head: "-flag", base: "main", wantErr: "invalid source branch \"-flag\": branch cannot start with '-'"},
+		{name: "flag base", head: "feat", base: "-target", wantErr: "invalid target branch \"-target\": branch cannot start with '-'"},
+		{name: "flag owner", head: "feat", base: "main", ownerOverride: "-badowner", wantErr: "invalid owner \"-badowner\": owner cannot start with '-'"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := PrCreate("owner/repo", tc.head, tc.base, "Title", "Body", tc.ownerOverride, "https://node.example.com", tempDir)
+			if err == nil || err.Error() != tc.wantErr {
+				t.Fatalf("expected error %q, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
