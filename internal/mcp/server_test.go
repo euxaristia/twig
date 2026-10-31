@@ -134,3 +134,26 @@ func TestRepoCreateOptionInjectionMCP(t *testing.T) {
 		t.Errorf("expected error for flag-like repo name in MCP tool call, got %v", err)
 	}
 }
+
+func TestPrCreateOptionInjectionMCP(t *testing.T) {
+	srv := NewServer("https://node.gitlawb.com", nil)
+	_, err := srv.callTool("pr_create", map[string]interface{}{
+		"repo":  "owner/repo",
+		"head":  "-evil-head",
+		"base":  "main",
+		"title": "Fix",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid source branch \"-evil-head\": branch cannot start with '-'") {
+		t.Errorf("expected error for flag-like head branch in MCP tool call, got %v", err)
+	}
+
+	_, err = srv.callTool("pr_create", map[string]interface{}{
+		"repo":  "owner/repo",
+		"head":  "feat",
+		"base":  "-evil-base",
+		"title": "Fix",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid target branch \"-evil-base\": branch cannot start with '-'") {
+		t.Errorf("expected error for flag-like base branch in MCP tool call, got %v", err)
+	}
+}

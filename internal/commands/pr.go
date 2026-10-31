@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 
 	"github.com/Twigpine/twig/internal/client"
 	"github.com/Twigpine/twig/internal/identity"
@@ -12,6 +13,16 @@ import (
 
 // PrCreate opens a pull request.
 func PrCreate(repoInput, head, base, title, body, ownerOverride, nodeURL, dirOverride string) error {
+	if strings.HasPrefix(strings.TrimSpace(head), "-") {
+		return fmt.Errorf("invalid source branch %q: branch cannot start with '-'", head)
+	}
+	if strings.HasPrefix(strings.TrimSpace(base), "-") {
+		return fmt.Errorf("invalid target branch %q: branch cannot start with '-'", base)
+	}
+	if strings.HasPrefix(strings.TrimSpace(ownerOverride), "-") {
+		return fmt.Errorf("invalid owner %q: owner cannot start with '-'", ownerOverride)
+	}
+
 	owner, name, err := ResolveRepoOwner(repoInput, dirOverride)
 	if err != nil {
 		return err

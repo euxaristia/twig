@@ -409,10 +409,18 @@ func (s *Server) callTool(name string, args map[string]interface{}) (string, err
 	case "pr_create":
 		repo, _ := args["repo"].(string)
 		owner, name := splitOwnerRepo(repo, s.resolveOwner())
+		head, _ := args["head"].(string)
+		base, _ := args["base"].(string)
+		if strings.HasPrefix(strings.TrimSpace(head), "-") {
+			return "", fmt.Errorf("invalid source branch %q: branch cannot start with '-'", head)
+		}
+		if strings.HasPrefix(strings.TrimSpace(base), "-") {
+			return "", fmt.Errorf("invalid target branch %q: branch cannot start with '-'", base)
+		}
 		body, _ := json.Marshal(map[string]interface{}{
 			"title":         args["title"],
-			"source_branch": args["head"],
-			"target_branch": args["base"],
+			"source_branch": head,
+			"target_branch": base,
 			"body":          args["body"],
 		})
 		resp, err := s.Client.Post(fmt.Sprintf("/api/v1/repos/%s/%s/pulls", url.PathEscape(owner), url.PathEscape(name)), body)
