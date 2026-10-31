@@ -32,32 +32,94 @@ type TxReceipt struct {
 
 // --- RLP (minimal, sufficient for transactions) ---
 
+// rlpEncodeBytes encodes raw byte payloads.
+// Optimized: Calculates exact destination slice size upfront to perform a single
+// allocation, avoiding intermediate slice copies from append chaining.
 func rlpEncodeBytes(b []byte) []byte {
 	if len(b) == 1 && b[0] < 0x80 {
 		return b
 	}
-	return append(rlpEncodeLength(len(b), 0x80), b...)
+	l := len(b)
+	if l <= 55 {
+		res := make([]byte, 1+l)
+		res[0] = 0x80 + byte(l)
+		copy(res[1:], b)
+		return res
+	}
+	var lenBuf [8]byte
+	lenSize := putUintLength(lenBuf[:], uint64(l))
+	res := make([]byte, 1+lenSize+l)
+	res[0] = 0x80 + 55 + byte(lenSize)
+	copy(res[1:], lenBuf[8-lenSize:])
+	copy(res[1+lenSize:], b)
+	return res
 }
 
+// putUintLength writes the minimal big-endian representation of v into the end of buf (8 bytes)
+// and returns the number of bytes written.
+func putUintLength(buf []byte, v uint64) int {
+	var size int
+	for temp := v; temp > 0; temp >>= 8 {
+		size++
+	}
+	for i := 0; i < size; i++ {
+		buf[len(buf)-1-i] = byte(v >> (8 * i))
+	}
+	return size
+}
+
+// rlpEncodeLength encodes the RLP length prefix.
+// Optimized: Directly computes length byte representation without big.Int heap allocations.
 func rlpEncodeLength(l int, offset byte) []byte {
 	if l <= 55 {
 		return []byte{offset + byte(l)}
 	}
-	bl := big.NewInt(int64(l)).Bytes()
-	return append([]byte{offset + 55 + byte(len(bl))}, bl...)
+	var lenBuf [8]byte
+	lenSize := putUintLength(lenBuf[:], uint64(l))
+	res := make([]byte, 1+lenSize)
+	res[0] = offset + 55 + byte(lenSize)
+	copy(res[1:], lenBuf[8-lenSize:])
+	return res
 }
 
+// rlpEncodeList encodes a list of RLP-encoded items.
+// Optimized: Computes exact total payload and header length to allocate a single byte slice,
+// copying items directly into the output buffer and eliminating slice append reallocations.
 func rlpEncodeList(items [][]byte) []byte {
-	var payload []byte
+	payloadLen := 0
 	for _, it := range items {
-		payload = append(payload, it...)
+		payloadLen += len(it)
 	}
-	return append(rlpEncodeLength(len(payload), 0xc0), payload...)
+
+	if payloadLen <= 55 {
+		res := make([]byte, 1+payloadLen)
+		res[0] = 0xc0 + byte(payloadLen)
+		offset := 1
+		for _, it := range items {
+			offset += copy(res[offset:], it)
+		}
+		return res
+	}
+
+	var lenBuf [8]byte
+	lenSize := putUintLength(lenBuf[:], uint64(payloadLen))
+	res := make([]byte, 1+lenSize+payloadLen)
+	res[0] = 0xc0 + 55 + byte(lenSize)
+	copy(res[1:], lenBuf[8-lenSize:])
+	offset := 1 + lenSize
+	for _, it := range items {
+		offset += copy(res[offset:], it)
+	}
+	return res
 }
 
+var rlpEmptyBytes = []byte{0x80}
+
+// rlpUint encodes a big.Int as an RLP integer.
+// Optimized: Returns static rlpEmptyBytes for zero/nil values without slice allocations.
 func rlpUint(v *big.Int) []byte {
 	if v == nil || v.Sign() == 0 {
-		return rlpEncodeBytes(nil)
+		return rlpEmptyBytes
 	}
 	return rlpEncodeBytes(v.Bytes())
 }
