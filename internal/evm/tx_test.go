@@ -120,6 +120,50 @@ func (m *mockRPC) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func TestRLPEncodingHelpers(t *testing.T) {
+	// Single byte < 0x80
+	if got := rlpEncodeBytes([]byte{0x7f}); !bytes.Equal(got, []byte{0x7f}) {
+		t.Fatalf("expected [0x7f], got %x", got)
+	}
+
+	// Single byte >= 0x80
+	if got := rlpEncodeBytes([]byte{0x80}); !bytes.Equal(got, []byte{0x81, 0x80}) {
+		t.Fatalf("expected [0x81, 0x80], got %x", got)
+	}
+
+	// Empty string/bytes
+	if got := rlpEncodeBytes(nil); !bytes.Equal(got, []byte{0x80}) {
+		t.Fatalf("expected [0x80], got %x", got)
+	}
+
+	// String length <= 55
+	short := []byte("dog")
+	if got := rlpEncodeBytes(short); !bytes.Equal(got, append([]byte{0x83}, short...)) {
+		t.Fatalf("short string rlp failed: got %x", got)
+	}
+
+	// Long string (> 55 bytes)
+	long := bytes.Repeat([]byte("a"), 60)
+	longEncoded := rlpEncodeBytes(long)
+	if longEncoded[0] != 0x80+55+1 || longEncoded[1] != 60 || !bytes.Equal(longEncoded[2:], long) {
+		t.Fatalf("long string rlp failed: got header %x %x", longEncoded[0], longEncoded[1])
+	}
+
+	// List length <= 55
+	listShort := rlpEncodeList([][]byte{rlpEncodeBytes([]byte("dog")), rlpEncodeBytes([]byte("cat"))})
+	items, ok := rlpDecodeList(listShort)
+	if !ok || len(items) != 2 {
+		t.Fatalf("listShort decode failed")
+	}
+
+	// List length > 55
+	listLong := rlpEncodeList([][]byte{longEncoded, longEncoded})
+	items, ok = rlpDecodeList(listLong)
+	if !ok || len(items) != 2 {
+		t.Fatalf("listLong decode failed")
+	}
+}
+
 func TestSendTransactionFullFlow(t *testing.T) {
 	txPollInterval = time.Millisecond
 	txPollTimeout = 5 * time.Second
@@ -264,5 +308,41 @@ func TestSendTransactionReverted(t *testing.T) {
 	_, err := SendTransaction(srv.URL, testPrivKey, "0x73094B9DAb2421878A20Abed1497001fbD51302c", []byte{1})
 	if err == nil || !strings.Contains(err.Error(), "reverted") {
 		t.Fatalf("expected revert error, got: %v", err)
+	}
+}
+
+func BenchmarkRLPEncodeTransaction(b *testing.B) {
+	chainID := new(big.Int).SetUint64(84532)
+	nonce := new(big.Int).SetUint64(10)
+	priorityFee := new(big.Int).SetUint64(1000000000)
+	maxFee := new(big.Int).SetUint64(2000000000)
+	gasLimit := new(big.Int).SetUint64(50000)
+	toBytes, _ := hex.DecodeString("73094B9DAb2421878A20Abed1497001fbD51302c")
+	data := append(EncodeFunctionSignature("register(string,string)"), EncodeStringParameter("alice")...)
+	r, _ := new(big.Int).SetString("a1b2c3d4e5f60102030405060708090a1b2c3d4e5f60102030405060708090a1", 16)
+	s, _ := new(big.Int).SetString("b2c3d4e5f60102030405060708090a1b2c3d4e5f60102030405060708090a1b2", 16)
+	yParity := uint64(1)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		unsigned := [][]byte{
+			rlpUint(chainID),
+			rlpUint(nonce),
+			rlpUint(priorityFee),
+			rlpUint(maxFee),
+			rlpUint(gasLimit),
+			rlpEncodeBytes(toBytes),
+			rlpUint(big.NewInt(0)),
+			rlpEncodeBytes(data),
+			rlpEncodeList(nil),
+		}
+		_ = rlpEncodeList(unsigned)
+		signed := append(unsigned,
+			rlpUint(new(big.Int).SetUint64(yParity)),
+			rlpUint(r),
+			rlpUint(s),
+		)
+		_ = append([]byte{0x02}, rlpEncodeList(signed)...)
 	}
 }
